@@ -4,9 +4,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Prisma 7: connection URLs moved out of schema.prisma.
-  // Runtime URL   → passed via PrismaPg adapter in lib/db/prisma.ts (DATABASE_URL)
-  // Migration URL → declared in prisma.config.ts             (DIRECT_URL)
+  // Prisma 7: url and directUrl are not supported here.
+  // Migration URL → prisma.config.ts  datasource.url  (DIRECT_URL, port 5432)
+  // Runtime URL   → lib/db/prisma.ts  PrismaPg adapter (DATABASE_URL, port 6543)
 }
 
 // ---------------------------------------------------------------------------

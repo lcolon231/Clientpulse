@@ -281,17 +281,21 @@ CREATE POLICY "audit_logs: org members can read their own logs"
 -- ---------------------------------------------------------------------------
 -- V1 — Confirm RLS is enabled and forced on the three tenant-scoped tables
 -- ---------------------------------------------------------------------------
--- Passing: three rows, one per table, both rowsecurity and forcerlspolicy = true.
+-- Passing: three rows, one per table, both rls_enabled and rls_forced = true.
 -- Failing: any row missing, or either column showing false.
+--
+-- Note: pg_tables only exposes rowsecurity. The FORCE flag lives on pg_class
+-- as relforcerowsecurity — so we join to get both in one query.
 
 SELECT
-    tablename,
-    rowsecurity      AS rls_enabled,
-    forcerlspolicy   AS rls_forced
-  FROM pg_tables
- WHERE schemaname = 'public'
-   AND tablename  IN ('clients', 'devices', 'audit_logs')
- ORDER BY tablename;
+    c.relname             AS tablename,
+    c.relrowsecurity      AS rls_enabled,
+    c.relforcerowsecurity AS rls_forced
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname = 'public'
+   AND c.relname IN ('clients', 'devices', 'audit_logs')
+ ORDER BY c.relname;
 
 -- ---------------------------------------------------------------------------
 -- V2 — List all RLS policies on the three tables
