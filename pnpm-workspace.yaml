@@ -4,3 +4,7 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+
+overrides:
+  postcss: ">=8.5.14"
+  "@hono/node-server": ">=1.19.13"
