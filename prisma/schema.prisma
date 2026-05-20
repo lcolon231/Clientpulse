@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: connection URLs moved out of schema.prisma.
+  // Runtime URL   → passed via PrismaPg adapter in lib/db/prisma.ts (DATABASE_URL)
+  // Migration URL → declared in prisma.config.ts             (DIRECT_URL)
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  TECHNICIAN
+  READONLY
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+/// The MSP tenant. Every other record hangs off one Organization.
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  clients   Client[]
+  auditLogs AuditLog[]
+
+  @@map("organizations")
+}
+
+/// An employee/user of the MSP. Linked to a Supabase Auth user via supabaseUserId.
+model User {
+  id             String       @id @default(cuid())
+  /// auth.users.id from Supabase — the UUID Supabase Auth issues on sign-up.
+  supabaseUserId String       @unique @map("supabase_user_id")
+  email          String       @unique
+  role           Role         @default(TECHNICIAN)
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+/// A small-business client that the MSP manages.
+model Client {
+  id             String       @id @default(cuid())
+  name           String
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  devices Device[]
+
+  @@index([organizationId])
+  @@map("clients")
+}
+
+/// A managed endpoint (workstation, server, NAS, etc.) belonging to a Client.
+model Device {
+  id           String   @id @default(cuid())
+  hostname     String
+  // TODO (Week 2): convert to enum once device-type taxonomy is defined
+  type         String
+  os           String
+  osVersion    String   @map("os_version")
+  lastSeen     DateTime @map("last_seen")
+  patchAgeDays Int      @map("patch_age_days")
+  tags         String[]
+  clientId     String   @map("client_id")
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([clientId])
+  @@map("devices")
+}
+
+/// Immutable append-only record written on every mutation.
+model AuditLog {
+  id             String       @id @default(cuid())
+  action         String
+  entityType     String       @map("entity_type")
+  entityId       String       @map("entity_id")
+  /// Arbitrary JSON payload — diff, old/new values, request context, etc.
+  metadata       Json         @default("{}")
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Nullable: system-initiated actions may not have a user (e.g. scheduled jobs).
+  userId         String?      @map("user_id")
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
