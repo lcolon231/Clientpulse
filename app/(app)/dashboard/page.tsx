@@ -1,73 +1,61 @@
-import { requireAuth } from "@/lib/auth";
+import { Users } from "lucide-react";
 
-import { SignOutButton } from "@/components/app/SignOutButton";
+import { requireAuth } from "@/lib/auth";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { InviteModal } from "@/components/app/InviteModal";
 
 export const metadata = {
   title: "Dashboard — ClientPulse",
 };
 
 export default async function DashboardPage() {
-  // requireAuth() redirects to /login if there is no valid session.
-  // After this line, both authUser and dbUser are guaranteed non-null.
+  // requireAuth() is also called by the layout, but calling it again here is
+  // cheap (result is cached for the request) and gives us direct access to role
+  // without prop-drilling through the Client Component shell.
   const { dbUser } = await requireAuth();
 
-  return (
-    <div className="flex min-h-svh flex-col">
-      {/* ------------------------------------------------------------------ */}
-      {/* Header                                                               */}
-      {/* ------------------------------------------------------------------ */}
-      <header className="border-b bg-background">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <span className="font-semibold tracking-tight">ClientPulse</span>
-          <SignOutButton />
-        </div>
-      </header>
+  const isOwner = dbUser.role === "OWNER";
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Main                                                                 */}
-      {/* ------------------------------------------------------------------ */}
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-12">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+  return (
+    <div className="flex flex-col gap-6 p-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground text-sm">
-            Week 1 placeholder — features coming soon.
+            {dbUser.organization.name}
           </p>
         </div>
 
-        {/* User + org identity card */}
-        <div className="rounded-xl border bg-background p-6 shadow-sm">
-          <dl className="space-y-4">
-            <div>
-              <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                Signed in as
-              </dt>
-              <dd className="mt-1 font-medium">
-                {/* TODO (Week 2): replace with dbUser.name once a name field
-                    is added to the User model. */}
-                {dbUser.email}
-              </dd>
-            </div>
+        {/* Invite button — only rendered for OWNER role.
+            The InviteModal server action has its own requireOwner() check,
+            so this is a UX convenience, not the security gate. */}
+        {isOwner && <InviteModal />}
+      </div>
 
-            <div>
-              <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                Organization
-              </dt>
-              <dd className="mt-1 font-medium">{dbUser.organization.name}</dd>
-            </div>
-
-            <div>
-              <dt className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                Role
-              </dt>
-              <dd className="mt-1">
-                <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
-                  {dbUser.role}
-                </span>
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </main>
+      {/* Empty state card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>No clients yet</CardTitle>
+          <CardDescription>
+            Add your first client to start monitoring their devices and health
+            metrics.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button disabled className="gap-1.5">
+            <Users className="h-4 w-4" />
+            Add Client
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -5,8 +5,18 @@ import { NextResponse, type NextRequest } from "next/server";
 // Route classification
 // ---------------------------------------------------------------------------
 
-/** Paths that are always public — no auth required. */
-const PUBLIC_PATHS = ["/login", "/signup"];
+/**
+ * Paths that are always public — no auth required.
+ * Include every (auth) route group page and the auth callback route handler.
+ */
+const PUBLIC_PATHS = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/accept-invite",
+  "/auth/callback", // token exchange for reset + invite emails
+];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
@@ -18,7 +28,7 @@ function isPublicPath(pathname: string): boolean {
 // Middleware
 // ---------------------------------------------------------------------------
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   /**
    * Why we build the Supabase client here instead of importing createServerSupabaseClient:
    *

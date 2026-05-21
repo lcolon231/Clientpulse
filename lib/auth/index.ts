@@ -96,3 +96,36 @@ export async function requireAuth(): Promise<{
 
   return { authUser, dbUser };
 }
+
+// ---------------------------------------------------------------------------
+// Role guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Like requireAuth(), but also enforces that the current user is an OWNER.
+ *
+ * Usage in Server Actions:
+ *   const { dbUser } = await requireOwner();
+ *
+ * Throws a 403 Response if the user is authenticated but not an owner.
+ * This is the server-side gate that protects privileged actions (e.g. invite).
+ * It is distinct from the UI-level visibility check (hiding the button in JSX)
+ * because UI checks can be bypassed by crafting a direct fetch to the action URL.
+ *
+ * Why Response instead of redirect? A 403 is semantically correct for a
+ * permission failure. redirect() is for authentication failures (no session).
+ * Server Actions surfacing a 403 Response will be caught by error boundaries
+ * or returned to the client as an error state.
+ */
+export async function requireOwner(): Promise<{
+  authUser: SupabaseUser;
+  dbUser: DbUserWithOrg;
+}> {
+  const result = await requireAuth();
+
+  if (result.dbUser.role !== "OWNER") {
+    throw new Response("Forbidden", { status: 403 });
+  }
+
+  return result;
+}

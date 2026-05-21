@@ -43,6 +43,8 @@ model User {
   /// auth.users.id from Supabase — the UUID Supabase Auth issues on sign-up.
   supabaseUserId String       @unique @map("supabase_user_id")
   email          String       @unique
+  /// Display name set by the user on accept-invite (or left null for existing owners).
+  name           String?
   role           Role         @default(TECHNICIAN)
   organizationId String       @map("organization_id")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
