@@ -10,7 +10,7 @@ ClientPulse is a multi-tenant SaaS dashboard built for Managed Service Providers
 |---|---|
 | Framework | Next.js 16 (App Router, TypeScript strict) |
 | Styling | Tailwind CSS v4 + shadcn/ui (base-nova style) |
-| Auth | Supabase Auth (email/password) |
+| Auth | Supabase Auth (email/password, PKCE flow) |
 | Database | Supabase Postgres with Row-Level Security |
 | ORM | Prisma (transaction-mode pooler at runtime, direct URL for migrations) |
 | Validation | Zod (schema-first, shared between client and server) |
@@ -44,8 +44,7 @@ pnpm install
 cp .env.example .env.local
 ```
 
-
-Open `.env.local` and fill in the five values. All of them are in your Supabase Dashboard:
+Open `.env.local` and fill in all six values:
 
 | Variable | Where to find it |
 |---|---|
@@ -54,10 +53,11 @@ Open `.env.local` and fill in the five values. All of them are in your Supabase 
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → **service_role** key |
 | `NEXT_PUBLIC_SUPABASE_URL` | Project Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API → **anon / public** key |
+| `NEXT_PUBLIC_SITE_URL` | Set to `http://localhost:3000` for local dev |
 
 ### 4. Push the Prisma schema
 
-This creates the five tables (`organizations`, `users`, `clients`, `devices`, `audit_logs`) in your Supabase project:
+This creates all five tables (`organizations`, `users`, `clients`, `devices`, `audit_logs`) in your Supabase project:
 
 ```bash
 pnpm db:push
@@ -65,14 +65,14 @@ pnpm db:push
 
 > Prisma uses `DIRECT_URL` (port 5432) for this operation — the transaction pooler does not support DDL statements.
 
-### 5. Apply the RLS migration
+### 5. Apply the RLS migrations
 
-The Prisma schema creates tables but does not enable Row-Level Security. Apply the hand-written migration manually:
+The Prisma schema creates tables but does not enable Row-Level Security. Apply both hand-written migrations manually:
 
 1. Open your Supabase project → **SQL Editor**
-2. Paste the full contents of `prisma/migrations/manual/001_rls_policies.sql`
-3. Click **Run**
-4. Run the four verification queries at the bottom of that file to confirm everything is in place
+2. Paste and run `prisma/migrations/manual/001_rls_policies.sql`
+3. Paste and run `prisma/migrations/manual/002_rls_organizations_users.sql`
+4. Run the verification queries at the bottom of each file to confirm everything is in place
 
 ### 6. Activate the Custom Access Token Hook
 
@@ -82,7 +82,17 @@ Without this step, the `org_id` claim will be missing from every JWT and all RLS
 2. Under **Custom Access Token**, select `public.custom_access_token_hook`
 3. Click **Save**
 
-### 7. Disable email confirmation (development only)
+### 7. Configure auth email redirect URLs
+
+The password reset and invite flows send emails with links back to your app. Supabase validates the redirect URL against an allowlist.
+
+1. Supabase Dashboard → **Authentication → URL Configuration**
+2. Under **Redirect URLs**, add `http://localhost:3000/auth/callback`
+3. For production, also add `https://your-app.vercel.app/auth/callback`
+
+> Without this step, password reset and invite emails will fail with a "redirect_uri_mismatch" error.
+
+### 8. Disable email confirmation (development only)
 
 By default Supabase requires email confirmation before a new account is active. For local development, disable it:
 
@@ -92,15 +102,15 @@ By default Supabase requires email confirmation before a new account is active. 
 
 > Re-enable this before going to production.
 
-### 8. Run the dev server
+### 9. Run the dev server
 
 ```bash
 pnpm dev
 ```
 
-Visit `http://localhost:3000/signup`, create an account, and confirm you land on `/dashboard` showing your email and organisation name.
+Visit `http://localhost:3000/signup`, create an account, and confirm you land on `/dashboard` showing your organisation name and the full app layout.
 
-### 9. Verify (optional)
+### 10. Verify (optional)
 
 ```bash
 pnpm type-check   # TypeScript — should produce no errors
@@ -114,25 +124,77 @@ pnpm format:check # Prettier
 
 ```
 /app
-  /(auth)          /login, /signup — public routes
-  /(app)           /dashboard and future auth-required routes
-  /api             Route handlers (empty in Week 1)
+  /(auth)            Public auth routes (no session required)
+    /login           Sign-in page with "Forgot password?" link
+    /signup          New org registration (atomic org + user transaction)
+    /forgot-password Request password reset email
+    /reset-password  Set new password (after clicking reset link)
+    /accept-invite   Complete invite setup (display name + password)
+  /(app)             Session-required routes — all wrapped by AppShell
+    /dashboard       Main dashboard: empty-state card + Invite Technician (owner only)
+    /coming-soon     Placeholder for sidebar nav links (Clients, Devices, etc.)
+  /auth
+    /callback        Route handler: exchanges Supabase PKCE code for a session,
+                     handles both password reset (type=recovery) and invite (type=invite)
+  /api               Route handlers (reserved for future use)
+
 /components
-  /ui              shadcn primitives (Button, Input, Label, …)
-  /app             Composed app components (LoginForm, SignupForm, …)
+  /ui                shadcn primitives (Button, Input, Label, Avatar, Card, Dialog, Sheet)
+  /app               Composed app components:
+                       AppShell      — top nav + desktop sidebar + mobile Sheet drawer
+                       Sidebar       — nav links (SidebarNav)
+                       LoginForm     — sign-in with "Forgot password?" link
+                       SignupForm     — new org registration
+                       SignOutButton — logout
+                       ForgotPasswordForm — reset request (browser Supabase client for PKCE)
+                       ResetPasswordForm  — set new password
+                       AcceptInviteForm   — complete invite (name + password)
+                       InviteModal        — owner-only invite dialog
+
 /lib
-  /supabase        browser.ts · server.ts · admin.ts
-  /db              prisma.ts (singleton with hot-reload guard)
-  /auth            index.ts (getAuthUser, getDbUser, requireAuth)
-  env.ts           Single typed, Zod-validated env entry point
-  utils.ts         cn() Tailwind class merger
+  /supabase          browser.ts · server.ts · admin.ts
+  /db                prisma.ts (singleton with hot-reload guard)
+  /auth              index.ts (getAuthUser, getDbUser, requireAuth, requireOwner)
+  audit.ts           logAudit() — append-only audit log writer
+  env.ts             Single typed, Zod-validated env entry point
+  utils.ts           cn() Tailwind class merger
+
 /prisma
   schema.prisma
   /migrations
-    /manual        Hand-written SQL (RLS policies, future DDL)
-/types             Shared TypeScript types and Zod schemas
-/docs              Test plans and technical reference
+    /manual          Hand-written SQL (RLS policies, JWT hook, DDL)
+
+/types               Shared TypeScript types
+/docs                Test plans and technical reference
 ```
+
+---
+
+## Auth & tenancy architecture
+
+### JWT org_id claim
+
+Every Supabase JWT carries a custom `org_id` claim injected by `public.custom_access_token_hook` (a Postgres function configured as a Supabase Auth Hook). RLS policies compare this claim against the `organization_id` column on every row — no application-level tenant filtering needed.
+
+### Invite flow
+
+1. Owner calls `inviteUserAction` (server action, protected by `requireOwner()`)
+2. The action calls `admin.auth.admin.inviteUserByEmail(email, { data: { org_id } })` — stores the org ID in `raw_user_meta_data` on the invited auth user
+3. Supabase sends the invite email; invited user clicks link → `/auth/callback` exchanges the PKCE code for a session
+4. User lands on `/accept-invite`: sets display name + password; the server action creates their `public.users` row via Prisma (bypasses RLS), then calls `supabase.auth.refreshSession()` to mint a new JWT with `org_id` embedded
+5. User is redirected to `/dashboard` with a fully valid session
+
+### Password reset
+
+Uses Supabase's PKCE flow. `resetPasswordForEmail` is called from the **browser** Supabase client (not a Server Action) so the PKCE code verifier stays in the browser's cookie jar for the subsequent callback exchange.
+
+### Role system
+
+Three roles: `OWNER`, `TECHNICIAN`, `READONLY` (stored on `public.users.role`).
+
+- `requireAuth()` — verifies session and returns `dbUser`; used by all protected pages
+- `requireOwner()` — extends `requireAuth()`, throws `403 Response` if role is not `OWNER`
+- UI visibility: the "Invite Technician" button is only rendered when `dbUser.role === 'OWNER'`
 
 ---
 
@@ -154,12 +216,14 @@ pnpm format:check # Prettier
 
 ## Roadmap
 
-<!--
-Week 2 — Client management (CRUD, search, pagination)
-Week 3 — Device inventory and patch-age health scoring
-Week 4 — Ticket integration (ConnectWise / Autotask)
-Week 5 — Backup status aggregation
-Week 6 — SLA metrics and threshold alerting
-Week 7 — PDF report generation
-Week 8 — Multi-technician RBAC and audit log viewer
--->
+| Week | Theme | Status |
+|---|---|---|
+| 1 | Foundation — schema, RLS, auth (signup / login / logout), dashboard placeholder | Done |
+| 2 | Auth & Tenancy — password reset, invite flow, role system, dashboard layout | Done |
+| 3 | Client management — CRUD, search, pagination | Upcoming |
+| 4 | Device inventory — list devices per client, patch-age health scoring | Planned |
+| 5 | Ticket integration — ConnectWise / Autotask read-only feed | Planned |
+| 6 | Backup status aggregation | Planned |
+| 7 | SLA metrics and threshold alerting | Planned |
+| 8 | PDF report generation | Planned |
+| 9 | Role management UI + audit log viewer | Planned |
