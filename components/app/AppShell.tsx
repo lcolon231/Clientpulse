@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { SidebarNav } from "@/components/app/Sidebar";
+import { Toaster } from "@/components/ui/toast";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,6 +67,7 @@ export function AppShell({
   const displayName = userName ?? userEmail;
 
   return (
+    <Toaster>
     <div className="flex min-h-svh flex-col">
       {/* ------------------------------------------------------------------ */}
       {/* Top navigation                                                       */}
@@ -131,5 +133,6 @@ export function AppShell({
         </main>
       </div>
     </div>
+    </Toaster>
   );
 }
