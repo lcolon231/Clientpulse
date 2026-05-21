@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 // ---------------------------------------------------------------------------
 
 const navItems = [
-  { label: "Clients", href: "/coming-soon", icon: Users },
+  { label: "Clients", href: "/clients", icon: Users },
   { label: "Devices", href: "/coming-soon", icon: Monitor },
   { label: "Reports", href: "/coming-soon", icon: BarChart3 },
   { label: "Settings", href: "/coming-soon", icon: Settings },

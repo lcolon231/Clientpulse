@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Users } from "lucide-react";
 
 import { requireAuth } from "@/lib/auth";
@@ -50,9 +51,9 @@ export default async function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button disabled className="gap-1.5">
+          <Button render={<Link href="/clients" />} className="gap-1.5">
             <Users className="h-4 w-4" />
-            Add Client
+            Go to Clients
           </Button>
         </CardContent>
       </Card>
