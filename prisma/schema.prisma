@@ -23,6 +23,7 @@ enum SlaTier {
   BASIC
   STANDARD
   PREMIUM
+  ENTERPRISE
 }
 
 // ---------------------------------------------------------------------------
@@ -65,17 +66,16 @@ model User {
 
 /// A small-business client that the MSP manages.
 model Client {
-  id                  String       @id @default(cuid())
-  name                String
-  industry            String?
-  primaryContact      String?
-  primaryContactEmail String?      @map("primary_contact_email")
-  slaTier             SlaTier      @default(BASIC) @map("sla_tier")
-  notes               String?
-  organizationId      String       @map("organization_id")
-  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  name           String
+  industry       String       @default("Other")
+  slaTier        SlaTier      @default(STANDARD) @map("sla_tier")
+  primaryContact String?      @map("primary_contact")
+  notes          String?
+  organizationId String       @map("organization_id")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   devices Device[]
 
