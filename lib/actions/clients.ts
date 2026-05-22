@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { logAudit } from "@/lib/audit";
 import { clientSchema } from "@/types";
 import type { Client } from "@prisma/client";
 
@@ -37,6 +38,15 @@ export async function createClient(rawData: unknown): Promise<CreateClientResult
       notes: notes?.trim() || null,
       organizationId: dbUser.organizationId,
     },
+  });
+
+  await logAudit({
+    action: "CLIENT_CREATE",
+    entityType: "Client",
+    entityId: client.id,
+    organizationId: dbUser.organizationId,
+    userId: dbUser.id,
+    metadata: { name: client.name },
   });
 
   revalidatePath("/clients");
@@ -91,6 +101,15 @@ export async function updateClient(
     },
   });
 
+  await logAudit({
+    action: "CLIENT_UPDATE",
+    entityType: "Client",
+    entityId: clientId,
+    organizationId: dbUser.organizationId,
+    userId: dbUser.id,
+    metadata: { name },
+  });
+
   revalidatePath("/clients");
   revalidatePath(`/clients/${clientId}`);
   return { success: true };
@@ -121,6 +140,14 @@ export async function deleteClient(clientId: string): Promise<DeleteClientResult
   }
 
   await prisma.client.delete({ where: { id: clientId } });
+
+  await logAudit({
+    action: "CLIENT_DELETE",
+    entityType: "Client",
+    entityId: clientId,
+    organizationId: dbUser.organizationId,
+    userId: dbUser.id,
+  });
 
   revalidatePath("/clients");
   return { success: true };

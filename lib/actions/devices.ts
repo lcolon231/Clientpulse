@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { logAudit } from "@/lib/audit";
 import { deviceSchema, type CsvDeviceRow } from "@/types";
 
 type DeviceResult = { success: true } | { success: false; error: string };
@@ -43,7 +44,7 @@ export async function createDevice(
 
   const { hostname, type, os, osVersion, lastSeen, patchAgeDays, tags } = parsed.data;
 
-  await prisma.device.create({
+  const device = await prisma.device.create({
     data: {
       hostname,
       type,
@@ -54,6 +55,15 @@ export async function createDevice(
       tags,
       clientId,
     },
+  });
+
+  await logAudit({
+    action: "DEVICE_CREATE",
+    entityType: "Device",
+    entityId: device.id,
+    organizationId: dbUser.organizationId,
+    userId: dbUser.id,
+    metadata: { hostname, clientId },
   });
 
   revalidatePath(`/clients/${clientId}`);
@@ -104,6 +114,15 @@ export async function updateDevice(
     },
   });
 
+  await logAudit({
+    action: "DEVICE_UPDATE",
+    entityType: "Device",
+    entityId: deviceId,
+    organizationId: dbUser.organizationId,
+    userId: dbUser.id,
+    metadata: { hostname, clientId },
+  });
+
   revalidatePath(`/clients/${clientId}`);
   return { success: true };
 }
@@ -132,6 +151,15 @@ export async function deleteDevice(
   if (!device) return { success: false, error: "Device not found." };
 
   await prisma.device.delete({ where: { id: deviceId } });
+
+  await logAudit({
+    action: "DEVICE_DELETE",
+    entityType: "Device",
+    entityId: deviceId,
+    organizationId: dbUser.organizationId,
+    userId: dbUser.id,
+    metadata: { clientId },
+  });
 
   revalidatePath(`/clients/${clientId}`);
   return { success: true };
@@ -203,6 +231,15 @@ export async function bulkCreateDevices(
   }
 
   await prisma.device.createMany({ data: toInsert });
+
+  await logAudit({
+    action: "DEVICE_IMPORT",
+    entityType: "Device",
+    entityId: clientId,
+    organizationId: dbUser.organizationId,
+    userId: dbUser.id,
+    metadata: { count: toInsert.length, skipped, clientId },
+  });
 
   revalidatePath(`/clients/${clientId}`);
   return { success: true, count: toInsert.length, skipped };
