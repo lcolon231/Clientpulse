@@ -76,16 +76,16 @@ export function AddDeviceSheet({
     }
   }
 
-  // Reset on close
-  React.useEffect(() => {
-    if (!open) {
+  function handleOpenChange(next: boolean) {
+    if (!next) {
       setFields(DEVICE_FORM_INITIAL);
       setErrors({});
     }
-  }, [open]);
+    onOpenChange(next);
+  }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="flex flex-col overflow-y-auto sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Add Device</SheetTitle>

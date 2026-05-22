@@ -53,10 +53,6 @@ export function EditDeviceSheet({
   const [pending, setPending] = React.useState(false);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-  React.useEffect(() => {
-    setFields(deviceToFields(device));
-  }, [device]);
-
   function onChange<K extends keyof DeviceFormFields>(
     key: K,
     value: DeviceFormFields[K]

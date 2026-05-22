@@ -1,5 +1,3 @@
-import { Users } from "lucide-react";
-
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { ClientListPage } from "@/components/app/clients/ClientListPage";

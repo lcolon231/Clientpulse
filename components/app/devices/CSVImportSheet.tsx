@@ -118,16 +118,19 @@ export function CSVImportSheet({
   const [parseError, setParseError] = React.useState("");
   const [pending, setPending] = React.useState(false);
 
-  React.useEffect(() => {
-    if (!open) {
-      setStep("upload");
-      setRows([]);
-      setTotalRows(0);
-      setFileName("");
-      setParseError("");
-      setPending(false);
-    }
-  }, [open]);
+  function resetState() {
+    setStep("upload");
+    setRows([]);
+    setTotalRows(0);
+    setFileName("");
+    setParseError("");
+    setPending(false);
+  }
+
+  function handleOpenChange(next: boolean) {
+    if (!next) resetState();
+    onOpenChange(next);
+  }
 
   function handleFile(file: File) {
     setParseError("");
@@ -175,7 +178,8 @@ export function CSVImportSheet({
 
     const result: BulkCreateResult = await bulkCreateDevices(
       clientId,
-      validRows.map(({ _valid: _, _errors: __, _rowIndex: ___, ...row }) => row)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      validRows.map(({ _valid, _errors, _rowIndex, ...row }) => row)
     );
 
     setPending(false);
@@ -199,7 +203,7 @@ export function CSVImportSheet({
   const invalidCount = rows.length - validCount;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
         className="flex flex-col overflow-y-auto sm:max-w-2xl"
