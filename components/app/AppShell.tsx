@@ -12,6 +12,7 @@ import {
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { SidebarNav } from "@/components/app/Sidebar";
 import { Toaster } from "@/components/ui/toast";
+import { Toaster as SonnerToaster } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,6 +68,7 @@ export function AppShell({
   const displayName = userName ?? userEmail;
 
   return (
+    <>
     <Toaster>
     <div className="flex min-h-svh flex-col">
       {/* ------------------------------------------------------------------ */}
@@ -134,5 +136,7 @@ export function AppShell({
       </div>
     </div>
     </Toaster>
+    <SonnerToaster richColors position="top-right" />
+    </>
   );
 }

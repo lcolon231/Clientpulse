@@ -34,21 +34,18 @@ export function EditClientDialog({
     name: client.name,
     industry: client.industry ?? "",
     primaryContact: client.primaryContact ?? "",
-    primaryContactEmail: client.primaryContactEmail ?? "",
-    slaTier: client.slaTier as "BASIC" | "STANDARD" | "PREMIUM",
+    slaTier: client.slaTier as "BASIC" | "STANDARD" | "PREMIUM" | "ENTERPRISE",
     notes: client.notes ?? "",
   });
   const [pending, setPending] = React.useState(false);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-  // Sync when client prop changes (e.g. after an update)
   React.useEffect(() => {
     setFields({
       name: client.name,
       industry: client.industry ?? "",
       primaryContact: client.primaryContact ?? "",
-      primaryContactEmail: client.primaryContactEmail ?? "",
-      slaTier: client.slaTier as "BASIC" | "STANDARD" | "PREMIUM",
+      slaTier: client.slaTier as "BASIC" | "STANDARD" | "PREMIUM" | "ENTERPRISE",
       notes: client.notes ?? "",
     });
   }, [client]);
@@ -61,13 +58,6 @@ export function EditClientDialog({
   function validate() {
     const e: Record<string, string> = {};
     if (!fields.name.trim()) e.name = "Name is required";
-    if (!fields.primaryContact.trim()) e.primaryContact = "Primary contact is required";
-    if (
-      fields.primaryContactEmail &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.primaryContactEmail)
-    ) {
-      e.primaryContactEmail = "Invalid email";
-    }
     return e;
   }
 
@@ -124,34 +114,13 @@ export function EditClientDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-contact">
-                Primary Contact <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="edit-contact"
-                value={fields.primaryContact}
-                onChange={(e) => set("primaryContact", e.target.value)}
-                aria-invalid={!!errors.primaryContact}
-              />
-              {errors.primaryContact && (
-                <p className="text-xs text-destructive">{errors.primaryContact}</p>
-              )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-email">Contact Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={fields.primaryContactEmail}
-                onChange={(e) => set("primaryContactEmail", e.target.value)}
-                aria-invalid={!!errors.primaryContactEmail}
-              />
-              {errors.primaryContactEmail && (
-                <p className="text-xs text-destructive">{errors.primaryContactEmail}</p>
-              )}
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-contact">Primary Contact</Label>
+            <Input
+              id="edit-contact"
+              value={fields.primaryContact}
+              onChange={(e) => set("primaryContact", e.target.value)}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -162,12 +131,13 @@ export function EditClientDialog({
               id="edit-sla"
               value={fields.slaTier}
               onChange={(e) =>
-                set("slaTier", e.target.value as "BASIC" | "STANDARD" | "PREMIUM")
+                set("slaTier", e.target.value)
               }
             >
               <option value="BASIC">Basic</option>
               <option value="STANDARD">Standard</option>
               <option value="PREMIUM">Premium</option>
+              <option value="ENTERPRISE">Enterprise</option>
             </Select>
           </div>
 

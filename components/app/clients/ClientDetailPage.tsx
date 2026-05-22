@@ -88,17 +88,6 @@ export function ClientDetailPage({
               <span className="text-foreground font-medium">
                 {client.primaryContact}
               </span>
-              {client.primaryContactEmail && (
-                <span className="text-muted-foreground">
-                  {" "}·{" "}
-                  <a
-                    href={`mailto:${client.primaryContactEmail}`}
-                    className="hover:underline"
-                  >
-                    {client.primaryContactEmail}
-                  </a>
-                </span>
-              )}
             </p>
           )}
           {client.notes && (

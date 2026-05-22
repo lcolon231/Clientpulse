@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AddClientDialog } from "@/components/app/clients/AddClientDialog";
+import { AddClientSheet } from "@/components/app/clients/AddClientSheet";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,12 +45,17 @@ const SLA_LABELS: Record<string, string> = {
   BASIC: "Basic",
   STANDARD: "Standard",
   PREMIUM: "Premium",
+  ENTERPRISE: "Enterprise",
 };
 
-const SLA_VARIANTS: Record<string, "basic" | "standard" | "premium"> = {
+const SLA_VARIANTS: Record<
+  string,
+  "basic" | "standard" | "premium" | "enterprise"
+> = {
   BASIC: "basic",
   STANDARD: "standard",
   PREMIUM: "premium",
+  ENTERPRISE: "enterprise",
 };
 
 function formatDate(date: Date) {
@@ -72,10 +77,8 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
 
   const filtered = clients.filter((c) => {
     const matchesSearch =
-      search === "" ||
-      c.name.toLowerCase().includes(search.toLowerCase());
-    const matchesSla =
-      slaFilter === "ALL" || c.slaTier === slaFilter;
+      search === "" || c.name.toLowerCase().includes(search.toLowerCase());
+    const matchesSla = slaFilter === "ALL" || c.slaTier === slaFilter;
     return matchesSearch && matchesSla;
   });
 
@@ -92,7 +95,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
         {canWrite && (
           <Button onClick={() => setAddOpen(true)} className="gap-1.5">
             <PlusIcon className="h-4 w-4" />
-            Add Client
+            New Client
           </Button>
         )}
       </div>
@@ -133,7 +136,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                 className="pl-8"
               />
             </div>
-            <div className="w-40">
+            <div className="w-44">
               <Select
                 value={slaFilter}
                 onChange={(e) => setSlaFilter(e.target.value)}
@@ -142,6 +145,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                 <option value="BASIC">Basic</option>
                 <option value="STANDARD">Standard</option>
                 <option value="PREMIUM">Premium</option>
+                <option value="ENTERPRISE">Enterprise</option>
               </Select>
             </div>
           </div>
@@ -153,10 +157,10 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Industry</TableHead>
-                  <TableHead>Primary Contact</TableHead>
                   <TableHead>SLA Tier</TableHead>
-                  <TableHead>Devices</TableHead>
+                  <TableHead>Primary Contact</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead className="w-16">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -171,7 +175,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                   </TableRow>
                 ) : (
                   filtered.map((client) => (
-                    <TableRow key={client.id} className="cursor-pointer">
+                    <TableRow key={client.id}>
                       <TableCell>
                         <Link
                           href={`/clients/${client.id}`}
@@ -184,27 +188,28 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                         {client.industry || "—"}
                       </TableCell>
                       <TableCell>
-                        {client.primaryContact ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-sm">{client.primaryContact}</span>
-                            {client.primaryContactEmail && (
-                              <span className="text-xs text-muted-foreground">
-                                {client.primaryContactEmail}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
                         <Badge variant={SLA_VARIANTS[client.slaTier]}>
                           {SLA_LABELS[client.slaTier]}
                         </Badge>
                       </TableCell>
-                      <TableCell>{client._count.devices}</TableCell>
+                      <TableCell>
+                        {client.primaryContact ? (
+                          <span className="text-sm">{client.primaryContact}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDate(client.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          render={<Link href={`/clients/${client.id}`} />}
+                        >
+                          View
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -215,11 +220,8 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
         </>
       )}
 
-      {/* Add Client dialog */}
-      <AddClientDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-      />
+      {/* New Client sheet */}
+      <AddClientSheet open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }

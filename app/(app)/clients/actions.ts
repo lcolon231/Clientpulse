@@ -14,9 +14,8 @@ import { logAudit } from "@/lib/audit";
 const clientSchema = z.object({
   name: z.string().min(1, "Name is required"),
   industry: z.string().optional(),
-  primaryContact: z.string().min(1, "Primary contact name is required"),
-  primaryContactEmail: z.string().email("Invalid email").optional().or(z.literal("")),
-  slaTier: z.enum(["BASIC", "STANDARD", "PREMIUM"]),
+  primaryContact: z.string().optional(),
+  slaTier: z.enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"]),
   notes: z.string().optional(),
 });
 
@@ -51,9 +50,8 @@ export async function createClientAction(
   const client = await prisma.client.create({
     data: {
       name: data.name,
-      industry: data.industry || null,
+      industry: data.industry || "Other",
       primaryContact: data.primaryContact || null,
-      primaryContactEmail: data.primaryContactEmail || null,
       slaTier: data.slaTier,
       notes: data.notes || null,
       organizationId: dbUser.organizationId,
@@ -95,7 +93,7 @@ export async function updateClientAction(
   // Verify ownership — the client must belong to this org
   const existing = await prisma.client.findFirst({
     where: { id: clientId, organizationId: dbUser.organizationId },
-    select: { id: true, name: true, industry: true, primaryContact: true, primaryContactEmail: true, slaTier: true, notes: true },
+    select: { id: true, name: true, industry: true, primaryContact: true, slaTier: true, notes: true },
   });
 
   if (!existing) {
@@ -109,7 +107,6 @@ export async function updateClientAction(
   if (data.name !== existing.name) changedFields.push("name");
   if ((data.industry || null) !== existing.industry) changedFields.push("industry");
   if ((data.primaryContact || null) !== existing.primaryContact) changedFields.push("primaryContact");
-  if ((data.primaryContactEmail || null) !== existing.primaryContactEmail) changedFields.push("primaryContactEmail");
   if (data.slaTier !== existing.slaTier) changedFields.push("slaTier");
   if ((data.notes || null) !== existing.notes) changedFields.push("notes");
 
@@ -117,9 +114,8 @@ export async function updateClientAction(
     where: { id: clientId },
     data: {
       name: data.name,
-      industry: data.industry || null,
+      industry: data.industry || "Other",
       primaryContact: data.primaryContact || null,
-      primaryContactEmail: data.primaryContactEmail || null,
       slaTier: data.slaTier,
       notes: data.notes || null,
     },
