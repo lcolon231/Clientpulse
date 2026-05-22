@@ -29,6 +29,9 @@ export default async function ClientPage({
 
   const client = await prisma.client.findFirst({
     where: { id, organizationId: dbUser.organizationId },
+    include: {
+      devices: { orderBy: { createdAt: "desc" } },
+    },
   });
 
   if (!client) notFound();
@@ -36,6 +39,7 @@ export default async function ClientPage({
   return (
     <ClientDetailPage
       client={client}
+      devices={client.devices}
       role={dbUser.role}
       activeTab={sp.tab ?? "overview"}
     />

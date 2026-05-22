@@ -6,16 +6,16 @@ import { XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { TagBadge } from "@/components/app/devices/TagBadge";
+import { DEVICE_TYPE_OPTIONS, OS_OPTIONS, type DeviceType } from "@/types";
 
 // ---------------------------------------------------------------------------
-// Shared device form state type
+// Shared device form state
 // ---------------------------------------------------------------------------
 
 export interface DeviceFormFields {
   hostname: string;
-  type: "Server" | "Workstation" | "Laptop" | "Network" | "Other";
+  type: DeviceType;
   os: string;
   osVersion: string;
   lastSeen: string;
@@ -32,15 +32,6 @@ export const DEVICE_FORM_INITIAL: DeviceFormFields = {
   patchAgeDays: 0,
   tags: [],
 };
-
-const BASE_TAG_LIST = [
-  "Server",
-  "Workstation",
-  "Laptop",
-  "Network",
-  "Firewall",
-  "NAS",
-];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -103,28 +94,32 @@ export function DeviceForm({ fields, errors, onChange }: DeviceFormProps) {
         <Select
           id="dev-type"
           value={fields.type}
-          onChange={(e) =>
-            onChange("type", e.target.value as DeviceFormFields["type"])
-          }
+          onChange={(e) => onChange("type", e.target.value as DeviceType)}
         >
-          <option value="Server">Server</option>
-          <option value="Workstation">Workstation</option>
-          <option value="Laptop">Laptop</option>
-          <option value="Network">Network</option>
-          <option value="Other">Other</option>
+          {DEVICE_TYPE_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
         </Select>
       </div>
 
-      {/* OS */}
+      {/* OS + OS Version */}
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="dev-os">OS</Label>
-          <Input
+          <Select
             id="dev-os"
             value={fields.os}
             onChange={(e) => onChange("os", e.target.value)}
-            placeholder="Windows Server 2022"
-          />
+          >
+            <option value="">Select OS</option>
+            {OS_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </Select>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="dev-osver">OS Version</Label>
@@ -167,49 +162,29 @@ export function DeviceForm({ fields, errors, onChange }: DeviceFormProps) {
 
       {/* Tags */}
       <div className="flex flex-col gap-1.5">
-        <Label>Tags</Label>
-        {/* Quick-select from base list */}
-        <div className="flex flex-wrap gap-1">
-          {BASE_TAG_LIST.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => addTag(tag)}
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
-                fields.tags.includes(tag)
-                  ? "opacity-40 cursor-default"
-                  : "bg-muted text-muted-foreground hover:bg-muted/70 cursor-pointer"
-              }`}
-              disabled={fields.tags.includes(tag)}
-            >
-              + {tag}
-            </button>
-          ))}
-        </div>
-        {/* Free-form input */}
+        <Label htmlFor="dev-tags">Tags</Label>
         <Input
+          id="dev-tags"
           value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={handleTagKeyDown}
-          onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-          placeholder="Type a tag and press Enter"
+          onBlur={() => {
+            if (tagInput.trim()) addTag(tagInput);
+          }}
+          placeholder="Type a tag and press Enter or comma"
         />
-        {/* Selected tags */}
         {fields.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
+          <div className="flex flex-wrap gap-1">
             {fields.tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1"
-              >
+              <span key={tag} className="inline-flex items-center gap-1">
                 <TagBadge tag={tag} />
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
                   className="text-muted-foreground hover:text-foreground"
+                  aria-label={`Remove tag ${tag}`}
                 >
                   <XIcon className="h-3 w-3" />
-                  <span className="sr-only">Remove {tag}</span>
                 </button>
               </span>
             ))}

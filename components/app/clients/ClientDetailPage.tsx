@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
 
-import type { Client, Role } from "@prisma/client";
+import type { Client, Device, Role } from "@prisma/client";
+import { DevicesTab } from "@/components/app/devices/DevicesTab";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import { SLA_TIER_LABELS } from "@/types";
 
 interface ClientDetailPageProps {
   client: Client;
+  devices: Device[];
   role: Role;
   activeTab: string;
 }
@@ -72,6 +74,7 @@ const VALID_TABS = ["overview", "devices", "tickets", "reports"];
 
 export function ClientDetailPage({
   client,
+  devices,
   role,
   activeTab,
 }: ClientDetailPageProps) {
@@ -179,13 +182,13 @@ export function ClientDetailPage({
           </Card>
         </TabsContent>
 
-        {/* Devices — placeholder */}
+        {/* Devices */}
         <TabsContent value="devices">
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Devices will appear here.
-            </CardContent>
-          </Card>
+          <DevicesTab
+            clientId={client.id}
+            devices={devices}
+            canWrite={role !== "READONLY"}
+          />
         </TabsContent>
 
         {/* Tickets — placeholder */}
