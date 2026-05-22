@@ -218,6 +218,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                         <Button
                           variant="ghost"
                           size="sm"
+                          nativeButton={false}
                           render={<Link href={`/clients/${client.id}`} />}
                         >
                           View

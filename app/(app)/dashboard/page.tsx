@@ -51,7 +51,7 @@ export default async function DashboardPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button render={<Link href="/clients" />} className="gap-1.5">
+          <Button render={<Link href="/clients" />} nativeButton={false} className="gap-1.5">
             <Users className="h-4 w-4" />
             Go to Clients
           </Button>
