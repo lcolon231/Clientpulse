@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -91,12 +92,15 @@ export function AddDeviceSheet({
         </SheetHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-4 pb-4" noValidate>
-          <DeviceForm fields={fields} errors={errors} onChange={onChange} />
-          <SheetFooter>
-            <Button type="submit" disabled={pending} className="w-full">
-              {pending ? "Adding…" : "Add Device"}
-            </Button>
-          </SheetFooter>
+          <fieldset disabled={pending} className="contents">
+            <DeviceForm fields={fields} errors={errors} onChange={onChange} />
+            <SheetFooter>
+              <Button type="submit" disabled={pending} className="w-full gap-2">
+                {pending && <Loader2Icon className="h-4 w-4 animate-spin" />}
+                {pending ? "Adding…" : "Add Device"}
+              </Button>
+            </SheetFooter>
+          </fieldset>
         </form>
       </SheetContent>
     </Sheet>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PlusIcon, SearchIcon, UsersIcon } from "lucide-react";
+import { ChevronRightIcon, PlusIcon, SearchIcon, UsersIcon } from "lucide-react";
 
 import type { Client } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,15 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/dashboard" className="hover:text-foreground transition-colors">
+          Dashboard
+        </Link>
+        <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />
+        <span className="text-foreground font-medium">Clients</span>
+      </nav>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -134,12 +143,14 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8"
+                aria-label="Search clients"
               />
             </div>
             <div className="w-44">
               <Select
                 value={slaFilter}
                 onChange={(e) => setSlaFilter(e.target.value)}
+                aria-label="Filter by SLA tier"
               >
                 <option value="ALL">All tiers</option>
                 <option value="BASIC">Basic</option>
@@ -152,6 +163,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
 
           {/* Table */}
           <Card className="overflow-hidden p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -216,6 +228,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                 )}
               </TableBody>
             </Table>
+            </div>
           </Card>
         </>
       )}

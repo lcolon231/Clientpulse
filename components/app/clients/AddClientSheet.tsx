@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -75,6 +76,7 @@ export function AddClientSheet({ open, onOpenChange }: AddClientSheetProps) {
           className="flex flex-col gap-4 px-4 pb-4"
           noValidate
         >
+          <fieldset disabled={isSubmitting} className="contents">
           {/* Name */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="client-name">
@@ -163,10 +165,12 @@ export function AddClientSheet({ open, onOpenChange }: AddClientSheetProps) {
           </div>
 
           <SheetFooter>
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button type="submit" disabled={isSubmitting} className="w-full gap-2">
+              {isSubmitting && <Loader2Icon className="h-4 w-4 animate-spin" />}
               {isSubmitting ? "Creating…" : "Create Client"}
             </Button>
           </SheetFooter>
+          </fieldset>
         </form>
       </SheetContent>
     </Sheet>

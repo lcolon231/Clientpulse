@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Papa from "papaparse";
-import { UploadIcon, FileIcon, AlertCircleIcon, DownloadIcon } from "lucide-react";
+import { UploadIcon, FileIcon, AlertCircleIcon, DownloadIcon, Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -360,7 +360,9 @@ export function CSVImportSheet({
                 <Button
                   onClick={handleImport}
                   disabled={pending || validCount === 0}
+                  className="gap-2"
                 >
+                  {pending && <Loader2Icon className="h-4 w-4 animate-spin" />}
                   {pending
                     ? "Importing…"
                     : `Import ${validCount} valid ${validCount === 1 ? "row" : "rows"}`}

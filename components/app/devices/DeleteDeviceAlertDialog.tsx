@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -62,7 +63,8 @@ export function DeleteDeviceAlertDialog({
           <AlertDialogCancel render={<Button variant="outline" />}>
             Cancel
           </AlertDialogCancel>
-          <Button variant="destructive" onClick={handleConfirm} disabled={pending}>
+          <Button variant="destructive" onClick={handleConfirm} disabled={pending} className="gap-2">
+            {pending && <Loader2Icon className="h-4 w-4 animate-spin" />}
             {pending ? "Deleting…" : "Delete Device"}
           </Button>
         </AlertDialogFooter>
