@@ -2,17 +2,18 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeftIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
 
-import type { Client, Device, Role } from "@prisma/client";
+import type { Client, Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { EditClientDialog } from "@/components/app/clients/EditClientDialog";
-import { DeleteClientDialog } from "@/components/app/clients/DeleteClientDialog";
-import { DevicesTab } from "@/components/app/devices/DevicesTab";
+import { EditClientSheet } from "@/components/app/clients/EditClientSheet";
+import { DeleteClientAlertDialog } from "@/components/app/clients/DeleteClientAlertDialog";
+import { SLA_TIER_LABELS } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Types & helpers
@@ -20,84 +21,99 @@ import { DevicesTab } from "@/components/app/devices/DevicesTab";
 
 interface ClientDetailPageProps {
   client: Client;
-  devices: Device[];
-  deviceCount: number;
   role: Role;
-  dbUserId: string;
-  organizationId: string;
+  activeTab: string;
 }
 
-const SLA_LABELS: Record<string, string> = {
-  BASIC: "Basic",
-  STANDARD: "Standard",
-  PREMIUM: "Premium",
-};
-
-const SLA_VARIANTS: Record<string, "basic" | "standard" | "premium"> = {
+const SLA_VARIANTS: Record<
+  string,
+  "basic" | "standard" | "premium" | "enterprise"
+> = {
   BASIC: "basic",
   STANDARD: "standard",
   PREMIUM: "premium",
+  ENTERPRISE: "enterprise",
 };
+
+function formatDate(date: Date) {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// InfoRow — one metadata field in the overview grid
+// ---------------------------------------------------------------------------
+
+function InfoRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
+const VALID_TABS = ["overview", "devices", "tickets", "reports"];
+
 export function ClientDetailPage({
   client,
-  devices,
-  deviceCount,
   role,
-  dbUserId,
-  organizationId,
+  activeTab,
 }: ClientDetailPageProps) {
+  const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
 
   const isOwner = role === "OWNER";
   const canWrite = role !== "READONLY";
 
+  const currentTab = VALID_TABS.includes(activeTab) ? activeTab : "overview";
+
+  function handleTabChange(value: string | number | null) {
+    if (typeof value === "string") {
+      router.replace(`/clients/${client.id}?tab=${value}`, { scroll: false });
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
-      {/* Back link */}
-      <div>
-        <Link
-          href="/clients"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeftIcon className="h-3.5 w-3.5" />
-          All clients
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/dashboard" className="hover:text-foreground transition-colors">
+          Dashboard
         </Link>
-      </div>
+        <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />
+        <Link href="/clients" className="hover:text-foreground transition-colors">
+          Clients
+        </Link>
+        <ChevronRightIcon className="h-3.5 w-3.5 shrink-0" />
+        <span className="text-foreground font-medium truncate">{client.name}</span>
+      </nav>
 
-      {/* Header */}
+      {/* Page header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight">{client.name}</h1>
-            {client.industry && (
-              <Badge variant="default">{client.industry}</Badge>
-            )}
-            <Badge variant={SLA_VARIANTS[client.slaTier]}>
-              {SLA_LABELS[client.slaTier]}
-            </Badge>
-          </div>
-          {client.primaryContact && (
-            <p className="text-sm text-muted-foreground">
-              Contact:{" "}
-              <span className="text-foreground font-medium">
-                {client.primaryContact}
-              </span>
-            </p>
-          )}
-          {client.notes && (
-            <p className="text-sm text-muted-foreground max-w-prose">
-              {client.notes}
-            </p>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight">{client.name}</h1>
+          <Badge variant={SLA_VARIANTS[client.slaTier]}>
+            {SLA_TIER_LABELS[client.slaTier]}
+          </Badge>
         </div>
 
-        {/* Actions */}
         <div className="flex shrink-0 gap-2">
           {canWrite && (
             <Button
@@ -126,109 +142,73 @@ export function ClientDetailPage({
 
       <Separator />
 
-      {/* Tabs */}
-      <Tabs defaultValue="overview">
+      {/* Tabs — value controlled by URL searchParam */}
+      <Tabs value={currentTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="devices">
-            Devices{" "}
-            {deviceCount > 0 && (
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                {deviceCount}
-              </span>
-            )}
-          </TabsTrigger>
+          <TabsTrigger value="devices">Devices</TabsTrigger>
           <TabsTrigger value="tickets">Tickets</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
-        {/* Overview */}
+        {/* Overview — metadata info-card grid */}
         <TabsContent value="overview">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Devices
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{deviceCount}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Open Tickets
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-muted-foreground">—</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Last Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {devices.length > 0
-                    ? new Date(
-                        Math.max(
-                          ...devices.map((d) => new Date(d.updatedAt).getTime())
-                        )
-                      ).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    : "—"}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Devices */}
-        <TabsContent value="devices">
-          <DevicesTab
-            clientId={client.id}
-            devices={devices}
-            canWrite={canWrite}
-            dbUserId={dbUserId}
-            organizationId={organizationId}
-          />
-        </TabsContent>
-
-        {/* Tickets placeholder */}
-        <TabsContent value="tickets">
           <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Ticket sync coming in Week 6
+            <CardContent className="pt-6">
+              <dl className="grid grid-cols-1 gap-y-5 gap-x-8 sm:grid-cols-2">
+                <InfoRow label="Industry">{client.industry || "—"}</InfoRow>
+                <InfoRow label="SLA Tier">
+                  <Badge variant={SLA_VARIANTS[client.slaTier]}>
+                    {SLA_TIER_LABELS[client.slaTier]}
+                  </Badge>
+                </InfoRow>
+                <InfoRow label="Primary Contact">
+                  {client.primaryContact || "—"}
+                </InfoRow>
+                <InfoRow label="Created">{formatDate(client.createdAt)}</InfoRow>
+                <InfoRow label="Notes">
+                  {client.notes ? (
+                    <span className="whitespace-pre-line">{client.notes}</span>
+                  ) : (
+                    "—"
+                  )}
+                </InfoRow>
+                <InfoRow label="Last Updated">{formatDate(client.updatedAt)}</InfoRow>
+              </dl>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Reports placeholder */}
+        {/* Devices — placeholder */}
+        <TabsContent value="devices">
+          <Card>
+            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+              Devices will appear here.
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tickets — placeholder */}
+        <TabsContent value="tickets">
+          <Card>
+            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+              Ticket integration coming soon.
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Reports — placeholder */}
         <TabsContent value="reports">
           <Card>
             <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Reports coming in Week 5
+              Reports available after health scoring is configured.
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Edit dialog */}
-      <EditClientDialog
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        client={client}
-      />
-
-      {/* Delete dialog */}
-      <DeleteClientDialog
+      <EditClientSheet open={editOpen} onOpenChange={setEditOpen} client={client} />
+      <DeleteClientAlertDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         clientId={client.id}

@@ -19,20 +19,16 @@ export async function generateMetadata({
 
 export default async function ClientPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { dbUser } = await requireAuth();
 
   const client = await prisma.client.findFirst({
     where: { id, organizationId: dbUser.organizationId },
-    include: {
-      devices: {
-        orderBy: { createdAt: "desc" },
-      },
-      _count: { select: { devices: true } },
-    },
   });
 
   if (!client) notFound();
@@ -40,11 +36,8 @@ export default async function ClientPage({
   return (
     <ClientDetailPage
       client={client}
-      devices={client.devices}
-      deviceCount={client._count.devices}
       role={dbUser.role}
-      dbUserId={dbUser.id}
-      organizationId={dbUser.organizationId}
+      activeTab={sp.tab ?? "overview"}
     />
   );
 }
