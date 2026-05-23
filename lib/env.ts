@@ -28,6 +28,10 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z
     .string()
     .min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
+  /** Resend API key for transactional email (reports + alerts). */
+  RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
+  /** Bearer token that Vercel attaches to cron requests. */
+  CRON_SECRET: z.string().min(1, "CRON_SECRET is required"),
 });
 
 const clientSchema = z.object({
@@ -75,6 +79,8 @@ export const serverEnv = parseEnv(
     DATABASE_URL: process.env.DATABASE_URL,
     DIRECT_URL: process.env.DIRECT_URL,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    CRON_SECRET: process.env.CRON_SECRET,
   },
   "server"
 );

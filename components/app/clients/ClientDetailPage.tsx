@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { ChevronRightIcon, DownloadIcon, PencilIcon, Trash2Icon } from "lucide-react";
 
 import type { Client, Device, Role } from "@prisma/client";
 import type { HealthResult } from "@/lib/health/score";
@@ -243,11 +243,39 @@ export function ClientDetailPage({
           </Card>
         </TabsContent>
 
-        {/* Reports — placeholder */}
+        {/* Reports */}
         <TabsContent value="reports">
           <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Reports available after health scoring is configured.
+            <CardHeader>
+              <CardTitle>Monthly Health Report</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Download a PDF summary of this client&apos;s health score,
+                device status, and recent audit activity for the current month.
+              </p>
+              {canWrite ? (
+                <a
+                  href={`/api/reports/${client.id}/monthly`}
+                  download
+                  className="inline-flex w-fit"
+                >
+                  <Button className="gap-1.5">
+                    <DownloadIcon className="h-4 w-4" />
+                    Download Report
+                  </Button>
+                </a>
+              ) : (
+                <span
+                  title="Read-only users cannot download reports"
+                  className="inline-flex w-fit cursor-not-allowed"
+                >
+                  <Button disabled className="pointer-events-none gap-1.5">
+                    <DownloadIcon className="h-4 w-4" />
+                    Download Report
+                  </Button>
+                </span>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
