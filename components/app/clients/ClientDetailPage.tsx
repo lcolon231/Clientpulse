@@ -6,14 +6,16 @@ import { useRouter } from "next/navigation";
 import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
 
 import type { Client, Device, Role } from "@prisma/client";
+import type { HealthResult } from "@/lib/health/score";
 import { DevicesTab } from "@/components/app/devices/DevicesTab";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { EditClientSheet } from "@/components/app/clients/EditClientSheet";
 import { DeleteClientAlertDialog } from "@/components/app/clients/DeleteClientAlertDialog";
+import { HealthBadge, BAND_SCORE_COLOR } from "@/components/ui/health-badge";
 import { SLA_TIER_LABELS } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -25,6 +27,7 @@ interface ClientDetailPageProps {
   devices: Device[];
   role: Role;
   activeTab: string;
+  health: HealthResult;
 }
 
 const SLA_VARIANTS: Record<
@@ -77,6 +80,7 @@ export function ClientDetailPage({
   devices,
   role,
   activeTab,
+  health,
 }: ClientDetailPageProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
@@ -154,32 +158,71 @@ export function ClientDetailPage({
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
-        {/* Overview — metadata info-card grid */}
+        {/* Overview — health card + metadata grid */}
         <TabsContent value="overview">
-          <Card>
-            <CardContent className="pt-6">
-              <dl className="grid grid-cols-1 gap-y-5 gap-x-8 sm:grid-cols-2">
-                <InfoRow label="Industry">{client.industry || "—"}</InfoRow>
-                <InfoRow label="SLA Tier">
-                  <Badge variant={SLA_VARIANTS[client.slaTier]}>
-                    {SLA_TIER_LABELS[client.slaTier]}
-                  </Badge>
-                </InfoRow>
-                <InfoRow label="Primary Contact">
-                  {client.primaryContact || "—"}
-                </InfoRow>
-                <InfoRow label="Created">{formatDate(client.createdAt)}</InfoRow>
-                <InfoRow label="Notes">
-                  {client.notes ? (
-                    <span className="whitespace-pre-line">{client.notes}</span>
-                  ) : (
-                    "—"
-                  )}
-                </InfoRow>
-                <InfoRow label="Last Updated">{formatDate(client.updatedAt)}</InfoRow>
-              </dl>
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* Health card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Client Health</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-5">
+                {/* Score + band */}
+                <div className="flex items-end gap-3">
+                  <span
+                    className={`text-5xl font-bold tabular-nums leading-none ${BAND_SCORE_COLOR[health.band]}`}
+                  >
+                    {health.score}
+                  </span>
+                  <HealthBadge health={health} />
+                </div>
+                {/* Component breakdown */}
+                <div className="flex flex-col gap-4">
+                  {health.components.map((comp) => (
+                    <div key={comp.name} className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{comp.name}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {comp.score}/100
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {comp.detail}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Client info card */}
+            <Card className="md:col-span-2">
+              <CardContent className="pt-6">
+                <dl className="grid grid-cols-1 gap-y-5 gap-x-8 sm:grid-cols-2">
+                  <InfoRow label="Industry">{client.industry || "—"}</InfoRow>
+                  <InfoRow label="SLA Tier">
+                    <Badge variant={SLA_VARIANTS[client.slaTier]}>
+                      {SLA_TIER_LABELS[client.slaTier]}
+                    </Badge>
+                  </InfoRow>
+                  <InfoRow label="Primary Contact">
+                    {client.primaryContact || "—"}
+                  </InfoRow>
+                  <InfoRow label="Created">{formatDate(client.createdAt)}</InfoRow>
+                  <InfoRow label="Notes">
+                    {client.notes ? (
+                      <span className="whitespace-pre-line">{client.notes}</span>
+                    ) : (
+                      "—"
+                    )}
+                  </InfoRow>
+                  <InfoRow label="Last Updated">
+                    {formatDate(client.updatedAt)}
+                  </InfoRow>
+                </dl>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Devices */}

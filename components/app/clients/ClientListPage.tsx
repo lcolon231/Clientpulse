@@ -5,10 +5,12 @@ import Link from "next/link";
 import { ChevronRightIcon, PlusIcon, SearchIcon, UsersIcon } from "lucide-react";
 
 import type { Client } from "@prisma/client";
+import type { HealthResult } from "@/lib/health/score";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { HealthBadge } from "@/components/ui/health-badge";
 import {
   Card,
   CardContent,
@@ -35,6 +37,7 @@ type ClientWithCount = Client & { _count: { devices: number } };
 interface ClientListPageProps {
   clients: ClientWithCount[];
   canWrite: boolean;
+  healthScores: Record<string, HealthResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +73,7 @@ function formatDate(date: Date) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
+export function ClientListPage({ clients, canWrite, healthScores }: ClientListPageProps) {
   const [search, setSearch] = React.useState("");
   const [slaFilter, setSlaFilter] = React.useState<string>("ALL");
   const [addOpen, setAddOpen] = React.useState(false);
@@ -170,6 +173,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                   <TableHead>Name</TableHead>
                   <TableHead>Industry</TableHead>
                   <TableHead>SLA Tier</TableHead>
+                  <TableHead>Health</TableHead>
                   <TableHead>Primary Contact</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-16">Actions</TableHead>
@@ -179,7 +183,7 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                 {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="py-8 text-center text-sm text-muted-foreground"
                     >
                       No clients match your filters.
@@ -203,6 +207,13 @@ export function ClientListPage({ clients, canWrite }: ClientListPageProps) {
                         <Badge variant={SLA_VARIANTS[client.slaTier]}>
                           {SLA_LABELS[client.slaTier]}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {healthScores[client.id] ? (
+                          <HealthBadge health={healthScores[client.id]} />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {client.primaryContact ? (

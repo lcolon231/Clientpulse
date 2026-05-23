@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
+import { getClientHealth } from "@/lib/health/calculate-client-health";
 import { ClientDetailPage } from "@/components/app/clients/ClientDetailPage";
 
 export async function generateMetadata({
@@ -27,12 +28,13 @@ export default async function ClientPage({
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { dbUser } = await requireAuth();
 
-  const client = await prisma.client.findFirst({
-    where: { id, organizationId: dbUser.organizationId },
-    include: {
-      devices: { orderBy: { createdAt: "desc" } },
-    },
-  });
+  const [client, health] = await Promise.all([
+    prisma.client.findFirst({
+      where: { id, organizationId: dbUser.organizationId },
+      include: { devices: { orderBy: { createdAt: "desc" } } },
+    }),
+    getClientHealth(id, dbUser.organizationId),
+  ]);
 
   if (!client) notFound();
 
@@ -42,6 +44,7 @@ export default async function ClientPage({
       devices={client.devices}
       role={dbUser.role}
       activeTab={sp.tab ?? "overview"}
+      health={health}
     />
   );
 }
