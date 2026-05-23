@@ -67,6 +67,8 @@ export async function createDevice(
   });
 
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/clients");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -124,6 +126,8 @@ export async function updateDevice(
   });
 
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/clients");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -162,6 +166,8 @@ export async function deleteDevice(
   });
 
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/clients");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -242,5 +248,7 @@ export async function bulkCreateDevices(
   });
 
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/clients");
+  revalidatePath("/dashboard");
   return { success: true, count: toInsert.length, skipped };
 }
