@@ -6,8 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // ---------------------------------------------------------------------------
 
 /**
- * Paths that are always public — no auth required.
- * Include every (auth) route group page and the auth callback route handler.
+ * Paths that don't require authentication (unauthenticated users may visit).
  */
 const PUBLIC_PATHS = [
   "/login",
@@ -18,8 +17,26 @@ const PUBLIC_PATHS = [
   "/auth/callback", // token exchange for reset + invite emails
 ];
 
+/**
+ * Subset of public paths where an already-authenticated user has no business.
+ * Visiting /reset-password with a valid session is intentional (the PKCE reset
+ * flow authenticates the user first, then lets them set a new password), so it
+ * is deliberately excluded from this list.
+ */
+const REDIRECT_AUTHED_AWAY = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+];
+
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
+}
+
+function shouldRedirectAuthedUser(pathname: string): boolean {
+  return REDIRECT_AUTHED_AWAY.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
 }
@@ -90,7 +107,7 @@ export async function proxy(request: NextRequest) {
   // If the user is signed in and tries to visit a public auth page,
   // send them to the dashboard — no point showing a login form to someone
   // who is already authenticated.
-  if (user && isPublicPath(pathname)) {
+  if (user && shouldRedirectAuthedUser(pathname)) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/dashboard";
     dashboardUrl.search = "";

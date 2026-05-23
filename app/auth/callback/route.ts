@@ -46,9 +46,14 @@ export async function GET(request: NextRequest) {
     next && next.startsWith("/") && !next.startsWith("//") ? next : null;
 
   // Derive the fallback destination from context clues when `next` is absent.
+  // PKCE codes (code present, no type) come from the password-reset flow.
+  // Invites always include next=/accept-invite in the redirectTo, so safeNext
+  // catches them before we reach this fallback.
   const redirectTo =
     safeNext ??
-    (type === "invite" || (code && !type) ? "/accept-invite" : "/dashboard");
+    (type === "invite" ? "/accept-invite" :
+     (code && !type) ? "/reset-password" :
+     "/dashboard");
 
   const supabase = await createServerSupabaseClient();
   let exchangeError: string | null = null;
