@@ -28,15 +28,31 @@ export default async function ClientPage({
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { dbUser } = await requireAuth();
 
-  const [client, health] = await Promise.all([
+  const [client, health, rawSnapshots] = await Promise.all([
     prisma.client.findFirst({
       where: { id, organizationId: dbUser.organizationId },
       include: { devices: { orderBy: { createdAt: "desc" } } },
     }),
     getClientHealth(id, dbUser.organizationId),
+    // healthSnapshot may not exist yet (pre-Goal 6 DBs) — catch gracefully.
+    prisma.healthSnapshot
+      .findMany({
+        where: { clientId: id, organizationId: dbUser.organizationId },
+        orderBy: { date: "asc" },
+        select: { date: true, score: true, band: true },
+        take: 90,
+      })
+      .catch(() => []),
   ]);
 
   if (!client) notFound();
+
+  // Serialize Date → "YYYY-MM-DD" string before passing to the client component.
+  const snapshots = rawSnapshots.map((s) => ({
+    date: s.date.toISOString().slice(0, 10),
+    score: s.score,
+    band: s.band,
+  }));
 
   return (
     <ClientDetailPage
@@ -45,6 +61,7 @@ export default async function ClientPage({
       role={dbUser.role}
       activeTab={sp.tab ?? "overview"}
       health={health}
+      snapshots={snapshots}
     />
   );
 }
