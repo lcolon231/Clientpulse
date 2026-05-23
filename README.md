@@ -15,6 +15,7 @@ ClientPulse is a multi-tenant SaaS dashboard built for Managed Service Providers
 | ORM | Prisma (transaction-mode pooler at runtime, direct URL for migrations) |
 | Validation | Zod (schema-first, shared between client and server) |
 | Forms | react-hook-form + @hookform/resolvers/zod |
+| CSV parsing | Papaparse |
 | Package manager | pnpm |
 | Deploy target | Vercel |
 
@@ -57,13 +58,15 @@ Open `.env.local` and fill in all six values:
 
 ### 4. Push the Prisma schema
 
-This creates all five tables (`organizations`, `users`, `clients`, `devices`, `audit_logs`) in your Supabase project:
+This creates all five tables (`organizations`, `users`, `clients`, `devices`, `audit_logs`) and the `SlaTier` enum in your Supabase project:
 
 ```bash
 pnpm db:push
 ```
 
 > Prisma uses `DIRECT_URL` (port 5432) for this operation — the transaction pooler does not support DDL statements.
+
+> **Week 3 note:** If you are upgrading an existing deployment that already has the `clients` table from Week 1–2, `db:push` will add the five new columns (`industry`, `primary_contact`, `primary_contact_email`, `sla_tier`, `notes`) non-destructively. All new columns are nullable except `sla_tier`, which defaults to `BASIC`.
 
 ### 5. Apply the RLS migrations
 
@@ -132,24 +135,31 @@ pnpm format:check # Prettier
     /accept-invite   Complete invite setup (display name + password)
   /(app)             Session-required routes — all wrapped by AppShell
     /dashboard       Main dashboard: empty-state card + Invite Technician (owner only)
-    /coming-soon     Placeholder for sidebar nav links (Clients, Devices, etc.)
+    /clients         Client list — search, SLA filter, Add Client modal
+      /[id]          Client detail — Overview / Devices / Tickets / Reports tabs
+    /coming-soon     Placeholder for sidebar nav links not yet built
   /auth
     /callback        Route handler: exchanges Supabase PKCE code for a session,
                      handles both password reset (type=recovery) and invite (type=invite)
   /api               Route handlers (reserved for future use)
 
 /components
-  /ui                shadcn primitives (Button, Input, Label, Avatar, Card, Dialog, Sheet)
+  /ui                Primitives (Button, Input, Label, Avatar, Card, Dialog, Sheet,
+                     Badge, Select, Textarea, Table, Tabs, Separator, Toast)
   /app               Composed app components:
-                       AppShell      — top nav + desktop sidebar + mobile Sheet drawer
-                       Sidebar       — nav links (SidebarNav)
-                       LoginForm     — sign-in with "Forgot password?" link
-                       SignupForm     — new org registration
-                       SignOutButton — logout
-                       ForgotPasswordForm — reset request (browser Supabase client for PKCE)
-                       ResetPasswordForm  — set new password
-                       AcceptInviteForm   — complete invite (name + password)
-                       InviteModal        — owner-only invite dialog
+    /clients           ClientListPage, AddClientDialog, EditClientDialog,
+                       DeleteClientDialog, ClientDetailPage
+    /devices           DevicesTab, DeviceForm, AddDeviceDialog, EditDeviceDialog,
+                       DeleteDeviceDialog, TagBadge, CSVImportDialog
+                     AppShell      — top nav + desktop sidebar + mobile Sheet drawer
+                     Sidebar       — nav links (SidebarNav)
+                     LoginForm     — sign-in with "Forgot password?" link
+                     SignupForm     — new org registration
+                     SignOutButton — logout
+                     ForgotPasswordForm — reset request (browser Supabase client for PKCE)
+                     ResetPasswordForm  — set new password
+                     AcceptInviteForm   — complete invite (name + password)
+                     InviteModal        — owner-only invite dialog
 
 /lib
   /supabase          browser.ts · server.ts · admin.ts
@@ -195,6 +205,64 @@ Three roles: `OWNER`, `TECHNICIAN`, `READONLY` (stored on `public.users.role`).
 - `requireAuth()` — verifies session and returns `dbUser`; used by all protected pages
 - `requireOwner()` — extends `requireAuth()`, throws `403 Response` if role is not `OWNER`
 - UI visibility: the "Invite Technician" button is only rendered when `dbUser.role === 'OWNER'`
+- Mutation gates: "Add Device" / "Import CSV" buttons are hidden for `READONLY`; "Delete Client" is hidden for non-`OWNER`. Server actions perform the same role check independently of the UI state.
+
+---
+
+## Client & Device CRUD (Week 3)
+
+### Data model additions
+
+The `Client` table gained five new columns in Week 3:
+
+| Column | Type | Notes |
+|---|---|---|
+| `industry` | `text` (nullable) | Free-form industry label |
+| `primary_contact` | `text` (nullable) | Display name of the main contact |
+| `primary_contact_email` | `text` (nullable) | Contact email address |
+| `sla_tier` | `sla_tier` enum | `BASIC` / `STANDARD` / `PREMIUM`, defaults to `BASIC` |
+| `notes` | `text` (nullable) | Free-form notes |
+
+### Audit log actions
+
+Every mutation writes an immutable row to `audit_logs`:
+
+| Action | Trigger | Metadata |
+|---|---|---|
+| `client_created` | Add Client form submitted | `{ client_name }` |
+| `client_updated` | Edit Client form saved | `{ client_name, changed_fields[] }` |
+| `client_deleted` | Delete confirmed (OWNER only) | `{ client_name }` |
+| `device_added` | Add Device form submitted | `{ hostname, client_id }` |
+| `device_updated` | Edit Device form saved | `{ hostname, changed_fields[] }` |
+| `device_deleted` | Delete device confirmed | `{ hostname, client_id }` |
+| `devices_csv_imported` | CSV import confirmed | `{ count, client_id }` |
+
+### CSV import format
+
+The "Import CSV" button on the Devices tab accepts files with these columns:
+
+```
+hostname,type,os,os_version,last_seen,patch_age_days,tags
+web-01,Server,Ubuntu,22.04,2025-05-15,5,"Server,Network"
+```
+
+- `hostname` and `type` are required; rows missing either are highlighted red and skipped
+- `type` must be one of: `Server`, `Workstation`, `Laptop`, `Network`, `Other`
+- `tags` is a comma-separated list inside a quoted cell
+- All other columns are optional
+- Valid rows are bulk-inserted atomically via a single `createMany` call
+
+### Tag colour mapping
+
+| Tag | Colour |
+|---|---|
+| Server | Blue |
+| Workstation | Purple |
+| Laptop | Indigo |
+| Network | Green |
+| Firewall | Orange |
+| NAS | Yellow |
+| (free-form) | Gray |
 
 ---
 
@@ -220,10 +288,10 @@ Three roles: `OWNER`, `TECHNICIAN`, `READONLY` (stored on `public.users.role`).
 |---|---|---|
 | 1 | Foundation — schema, RLS, auth (signup / login / logout), dashboard placeholder | Done |
 | 2 | Auth & Tenancy — password reset, invite flow, role system, dashboard layout | Done |
-| 3 | Client management — CRUD, search, pagination | Upcoming |
-| 4 | Device inventory — list devices per client, patch-age health scoring | Planned |
-| 5 | Ticket integration — ConnectWise / Autotask read-only feed | Planned |
-| 6 | Backup status aggregation | Planned |
-| 7 | SLA metrics and threshold alerting | Planned |
-| 8 | PDF report generation | Planned |
+| 3 | Clients & Devices CRUD — client list/detail, device table, CSV import, tag system, audit log | Done |
+| 4 | Health scoring — patch-age scoring, device health snapshot table, Recharts dashboard | Planned |
+| 5 | Reports — PDF generation, scheduled email reports | Planned |
+| 6 | Ticket integration — ConnectWise / Autotask read-only feed | Planned |
+| 7 | Backup status aggregation | Planned |
+| 8 | SLA metrics and threshold alerting | Planned |
 | 9 | Role management UI + audit log viewer | Planned |
