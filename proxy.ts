@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/accept-invite",
   "/auth/callback", // token exchange for reset + invite emails
+  "/api/cron",      // cron endpoints authenticate via CRON_SECRET header, not session
 ];
 
 /**
