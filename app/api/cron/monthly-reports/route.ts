@@ -75,8 +75,8 @@ export async function POST(req: NextRequest) {
     for (const clientStub of org.clients) {
       try {
         // Fetch full client data with devices.
-        const client = await prisma.client.findUnique({
-          where: { id: clientStub.id },
+        const client = await prisma.client.findFirst({
+          where: { id: clientStub.id, organizationId: org.id },
           include: { devices: { orderBy: { hostname: "asc" } } },
         });
         if (!client) continue;
