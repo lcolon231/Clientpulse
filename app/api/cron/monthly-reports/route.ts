@@ -9,6 +9,7 @@ import {
   type DeviceRow,
 } from "@/lib/pdf/monthly-report";
 import { checkAndSendAlerts } from "@/lib/alerts/check-alerts";
+import { canUseFeature } from "@/lib/plans";
 import type { HealthResult } from "@/lib/health/score";
 
 // Vercel cron jobs can run up to 60 s on Hobby, 300 s on Pro.
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
     select: {
       id: true,
       name: true,
+      plan: true,
       users: {
         where: { role: "OWNER" },
         select: { email: true },
@@ -69,6 +71,9 @@ export async function POST(req: NextRequest) {
   });
 
   for (const org of orgs) {
+    // Skip orgs whose plan doesn't include scheduled reports.
+    if (!canUseFeature(org, "scheduled_reports")) continue;
+
     const ownerEmail = org.users[0]?.email;
     if (!ownerEmail) continue;
 

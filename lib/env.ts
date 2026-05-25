@@ -28,10 +28,16 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z
     .string()
     .min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
-  /** Resend API key for transactional email (reports + alerts). */
-  RESEND_API_KEY: z.string().min(1, "RESEND_API_KEY is required"),
+  /** Resend API key for transactional email (reports + alerts). Optional at build time. */
+  RESEND_API_KEY: z.string().min(1).optional(),
   /** Bearer token that Vercel attaches to cron requests. */
   CRON_SECRET: z.string().min(1, "CRON_SECRET is required"),
+  // Stripe — optional so the build succeeds before keys are provisioned.
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  STRIPE_PRICE_STARTER: z.string().min(1).optional(),
+  STRIPE_PRICE_GROWTH: z.string().min(1).optional(),
+  STRIPE_PRICE_ENTERPRISE: z.string().min(1).optional(),
 });
 
 const clientSchema = z.object({
@@ -81,6 +87,11 @@ export const serverEnv = parseEnv(
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     CRON_SECRET: process.env.CRON_SECRET,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER,
+    STRIPE_PRICE_GROWTH: process.env.STRIPE_PRICE_GROWTH,
+    STRIPE_PRICE_ENTERPRISE: process.env.STRIPE_PRICE_ENTERPRISE,
   },
   "server"
 );

@@ -5,12 +5,13 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
+import { canAddDevice, canUseFeature, PLAN_LIMITS, type Plan } from "@/lib/plans";
 import { deviceSchema, type CsvDeviceRow } from "@/types";
 
 type DeviceResult = { success: true } | { success: false; error: string };
 
 export type BulkCreateResult =
-  | { success: true; count: number; skipped: number }
+  | { success: true; count: number; skipped: number; warning?: string }
   | { success: false; error: string };
 
 async function verifyClientOwnership(clientId: string, organizationId: string) {
@@ -18,6 +19,10 @@ async function verifyClientOwnership(clientId: string, organizationId: string) {
     where: { id: clientId, organizationId },
     select: { id: true },
   });
+}
+
+async function getOrgDeviceCount(organizationId: string): Promise<number> {
+  return prisma.device.count({ where: { client: { organizationId } } });
 }
 
 // ---------------------------------------------------------------------------
@@ -36,6 +41,15 @@ export async function createDevice(
 
   const client = await verifyClientOwnership(clientId, dbUser.organizationId);
   if (!client) return { success: false, error: "Client not found." };
+
+  // Plan limit check
+  const deviceCount = await getOrgDeviceCount(dbUser.organizationId);
+  if (!canAddDevice(dbUser.organization, deviceCount)) {
+    return {
+      success: false,
+      error: "Device limit reached for your plan. Upgrade to add more devices.",
+    };
+  }
 
   const parsed = deviceSchema.safeParse(rawData);
   if (!parsed.success) {
@@ -67,7 +81,6 @@ export async function createDevice(
   });
 
   revalidatePath(`/clients/${clientId}`);
-  revalidatePath("/clients");
   revalidatePath("/dashboard");
   return { success: true };
 }
@@ -126,8 +139,6 @@ export async function updateDevice(
   });
 
   revalidatePath(`/clients/${clientId}`);
-  revalidatePath("/clients");
-  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -166,8 +177,6 @@ export async function deleteDevice(
   });
 
   revalidatePath(`/clients/${clientId}`);
-  revalidatePath("/clients");
-  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -183,6 +192,11 @@ export async function bulkCreateDevices(
 
   if (dbUser.role === "READONLY") {
     return { success: false, error: "You do not have permission to import devices." };
+  }
+
+  // Feature gate: CSV import requires Growth or Enterprise.
+  if (!canUseFeature(dbUser.organization, "csv_import")) {
+    return { success: false, error: "CSV import is not available on the Starter plan." };
   }
 
   const client = await verifyClientOwnership(clientId, dbUser.organizationId);
@@ -230,13 +244,38 @@ export async function bulkCreateDevices(
     }
   }
 
-  const skipped = rows.length - toInsert.length;
+  const validationSkipped = rows.length - toInsert.length;
 
   if (toInsert.length === 0) {
     return { success: false, error: "No valid rows to import." };
   }
 
-  await prisma.device.createMany({ data: toInsert });
+  // Device limit: insert up to the remaining capacity; skip the rest.
+  const currentDeviceCount = await getOrgDeviceCount(dbUser.organizationId);
+  const planLimits = PLAN_LIMITS[(dbUser.organization.plan as Plan) ?? "STARTER"] ?? PLAN_LIMITS.STARTER;
+  const { devices: deviceLimit } = planLimits;
+
+  let limitWarning: string | undefined;
+  let finalInsert = toInsert;
+
+  if (deviceLimit !== -1) {
+    const remaining = deviceLimit - currentDeviceCount;
+    if (remaining <= 0) {
+      return {
+        success: false,
+        error: "Device limit reached for your plan. Upgrade to add more devices.",
+      };
+    }
+    if (toInsert.length > remaining) {
+      finalInsert = toInsert.slice(0, remaining);
+      const planSkipped = toInsert.length - remaining;
+      limitWarning = `${planSkipped} device${planSkipped === 1 ? " was" : "s were"} skipped — you reached the ${deviceLimit}-device limit on your plan.`;
+    }
+  }
+
+  await prisma.device.createMany({ data: finalInsert });
+
+  const totalSkipped = validationSkipped + (toInsert.length - finalInsert.length);
 
   await logAudit({
     action: "DEVICE_IMPORT",
@@ -244,11 +283,15 @@ export async function bulkCreateDevices(
     entityId: clientId,
     organizationId: dbUser.organizationId,
     userId: dbUser.id,
-    metadata: { count: toInsert.length, skipped, clientId },
+    metadata: { count: finalInsert.length, skipped: totalSkipped, clientId },
   });
 
   revalidatePath(`/clients/${clientId}`);
-  revalidatePath("/clients");
   revalidatePath("/dashboard");
-  return { success: true, count: toInsert.length, skipped };
+  return {
+    success: true,
+    count: finalInsert.length,
+    skipped: totalSkipped,
+    warning: limitWarning,
+  };
 }

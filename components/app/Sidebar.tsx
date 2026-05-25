@@ -8,6 +8,7 @@ import {
   BarChart3,
   Settings,
   Gauge,
+  CreditCardIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ const navItems = [
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Devices", href: "/clients", icon: Monitor },
   { label: "Reports", href: "/coming-soon", icon: BarChart3 },
+  { label: "Billing", href: "/billing", icon: CreditCardIcon },
   { label: "Settings", href: "/coming-soon", icon: Settings },
 ];
 

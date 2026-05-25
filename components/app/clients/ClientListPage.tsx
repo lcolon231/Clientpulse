@@ -38,6 +38,7 @@ interface ClientListPageProps {
   clients: ClientWithCount[];
   canWrite: boolean;
   healthScores: Record<string, HealthResult>;
+  atClientLimit: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +74,7 @@ function formatDate(date: Date) {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ClientListPage({ clients, canWrite, healthScores }: ClientListPageProps) {
+export function ClientListPage({ clients, canWrite, healthScores, atClientLimit }: ClientListPageProps) {
   const [search, setSearch] = React.useState("");
   const [slaFilter, setSlaFilter] = React.useState<string>("ALL");
   const [addOpen, setAddOpen] = React.useState(false);
@@ -105,10 +106,19 @@ export function ClientListPage({ clients, canWrite, healthScores }: ClientListPa
           </p>
         </div>
         {canWrite && (
-          <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-            <PlusIcon className="h-4 w-4" />
-            New Client
-          </Button>
+          atClientLimit ? (
+            <span title="Client limit reached. Upgrade your plan.">
+              <Button disabled className="gap-1.5">
+                <PlusIcon className="h-4 w-4" />
+                New Client
+              </Button>
+            </span>
+          ) : (
+            <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+              <PlusIcon className="h-4 w-4" />
+              New Client
+            </Button>
+          )
         )}
       </div>
 

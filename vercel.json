@@ -4,5 +4,10 @@
       "path": "/api/cron/monthly-reports",
       "schedule": "0 8 1 * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/webhooks/stripe/route.ts": {
+      "bodyParser": false
+    }
+  }
 }

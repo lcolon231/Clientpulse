@@ -29,6 +29,7 @@ interface DevicesTabProps {
   clientId: string;
   devices: Device[];
   canWrite: boolean;
+  canUseCsvImport: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,11 +59,32 @@ function patchAgeClass(days: number): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function DevicesTab({ clientId, devices, canWrite }: DevicesTabProps) {
+export function DevicesTab({ clientId, devices, canWrite, canUseCsvImport }: DevicesTabProps) {
   const [addOpen, setAddOpen] = React.useState(false);
   const [csvOpen, setCsvOpen] = React.useState(false);
   const [editDevice, setEditDevice] = React.useState<Device | null>(null);
   const [deleteDevice, setDeleteDevice] = React.useState<Device | null>(null);
+
+  const csvImportButton = canWrite ? (
+    canUseCsvImport ? (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCsvOpen(true)}
+        className="gap-1.5"
+      >
+        <UploadIcon className="h-4 w-4" />
+        Import CSV
+      </Button>
+    ) : (
+      <span title="Available on Growth and Enterprise plans">
+        <Button variant="outline" size="sm" disabled className="gap-1.5">
+          <UploadIcon className="h-4 w-4" />
+          Import CSV
+        </Button>
+      </span>
+    )
+  ) : null;
 
   if (devices.length === 0) {
     return (
@@ -80,15 +102,7 @@ export function DevicesTab({ clientId, devices, canWrite }: DevicesTabProps) {
                 <PlusIcon className="h-4 w-4" />
                 Add Device
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCsvOpen(true)}
-                className="gap-1.5"
-              >
-                <UploadIcon className="h-4 w-4" />
-                Import CSV
-              </Button>
+              {csvImportButton}
             </CardContent>
           )}
         </Card>
@@ -96,7 +110,9 @@ export function DevicesTab({ clientId, devices, canWrite }: DevicesTabProps) {
         {canWrite && (
           <>
             <AddDeviceSheet open={addOpen} onOpenChange={setAddOpen} clientId={clientId} />
-            <CSVImportSheet open={csvOpen} onOpenChange={setCsvOpen} clientId={clientId} />
+            {canUseCsvImport && (
+              <CSVImportSheet open={csvOpen} onOpenChange={setCsvOpen} clientId={clientId} />
+            )}
           </>
         )}
       </>
@@ -108,15 +124,7 @@ export function DevicesTab({ clientId, devices, canWrite }: DevicesTabProps) {
       {/* Toolbar */}
       {canWrite && (
         <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCsvOpen(true)}
-            className="gap-1.5"
-          >
-            <UploadIcon className="h-3.5 w-3.5" />
-            Import CSV
-          </Button>
+          {csvImportButton}
           <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5">
             <PlusIcon className="h-3.5 w-3.5" />
             Add Device
@@ -222,7 +230,9 @@ export function DevicesTab({ clientId, devices, canWrite }: DevicesTabProps) {
               clientId={clientId}
             />
           )}
-          <CSVImportSheet open={csvOpen} onOpenChange={setCsvOpen} clientId={clientId} />
+          {canUseCsvImport && (
+            <CSVImportSheet open={csvOpen} onOpenChange={setCsvOpen} clientId={clientId} />
+          )}
         </>
       )}
     </div>

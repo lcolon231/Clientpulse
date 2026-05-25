@@ -32,10 +32,14 @@ enum SlaTier {
 
 /// The MSP tenant. Every other record hangs off one Organization.
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  name                 String
+  /// Subscription plan: "STARTER" | "GROWTH" | "ENTERPRISE"
+  plan                 String   @default("STARTER")
+  stripeCustomerId     String?  @map("stripe_customer_id")
+  stripeSubscriptionId String?  @map("stripe_subscription_id")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   users      User[]
   clients    Client[]

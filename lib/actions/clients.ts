@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
+import { canAddClient } from "@/lib/plans";
 import { clientSchema } from "@/types";
 import type { Client } from "@prisma/client";
 
@@ -17,6 +18,17 @@ export async function createClient(rawData: unknown): Promise<CreateClientResult
 
   if (dbUser.role === "READONLY") {
     return { success: false, error: "You do not have permission to create clients." };
+  }
+
+  // Plan limit check
+  const clientCount = await prisma.client.count({
+    where: { organizationId: dbUser.organizationId },
+  });
+  if (!canAddClient(dbUser.organization, clientCount)) {
+    return {
+      success: false,
+      error: "Client limit reached for your plan. Upgrade to add more clients.",
+    };
   }
 
   const parsed = clientSchema.safeParse(rawData);

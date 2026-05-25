@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Users, AlertTriangleIcon } from "lucide-react";
 
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { getOrgHealth } from "@/lib/health/calculate-client-health";
+import { PLAN_LIMITS, type Plan } from "@/lib/plans";
 import {
   Card,
   CardContent,
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
   const { organizationId } = dbUser;
   const isOwner = dbUser.role === "OWNER";
 
-  const [clients, orgHealthMap, recentLogs, devices] = await Promise.all([
+  const [clients, orgHealthMap, recentLogs, devices, deviceCount] = await Promise.all([
     prisma.client.findMany({
       where: { organizationId },
       select: {
@@ -58,7 +59,18 @@ export default async function DashboardPage() {
       where: { client: { organizationId } },
       select: { patchAgeDays: true },
     }),
+    prisma.device.count({ where: { client: { organizationId } } }),
   ]);
+
+  // --- Plan limit banner ---
+  const currentPlan = (dbUser.organization.plan ?? "STARTER") as Plan;
+  const limits = PLAN_LIMITS[currentPlan] ?? PLAN_LIMITS.STARTER;
+  const clientCount = clients.length;
+  const nearClientLimit =
+    limits.clients !== -1 && limits.clients - clientCount <= 2;
+  const nearDeviceLimit =
+    limits.devices !== -1 && limits.devices - deviceCount <= 10;
+  const showLimitBanner = nearClientLimit || nearDeviceLimit;
 
   // --- Tickets over time: audit log events grouped by day (last 14 days) ---
   const auditCountByDay = new Map<string, number>();
@@ -116,6 +128,20 @@ export default async function DashboardPage() {
         </div>
         {isOwner && <InviteModal />}
       </div>
+
+      {/* Plan limit banner */}
+      {showLimitBanner && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+          <AlertTriangleIcon className="h-4 w-4 shrink-0" />
+          <span className="flex-1">
+            You&apos;re approaching your plan limit.{" "}
+            <Link href="/billing" className="font-medium underline underline-offset-2">
+              Upgrade your plan
+            </Link>{" "}
+            to avoid interruptions.
+          </span>
+        </div>
+      )}
 
       {!hasClients ? (
         /* Empty state — no clients yet */

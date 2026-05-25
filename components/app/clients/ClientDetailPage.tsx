@@ -28,6 +28,7 @@ interface ClientDetailPageProps {
   role: Role;
   activeTab: string;
   health: HealthResult;
+  canUseCsvImport: boolean;
 }
 
 const SLA_VARIANTS: Record<
@@ -81,6 +82,7 @@ export function ClientDetailPage({
   role,
   activeTab,
   health,
+  canUseCsvImport,
 }: ClientDetailPageProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
@@ -231,6 +233,7 @@ export function ClientDetailPage({
             clientId={client.id}
             devices={devices}
             canWrite={role !== "READONLY"}
+            canUseCsvImport={canUseCsvImport}
           />
         </TabsContent>
 
