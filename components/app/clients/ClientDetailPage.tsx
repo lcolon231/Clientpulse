@@ -3,15 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { ChevronRightIcon, DownloadIcon, PencilIcon, Trash2Icon } from "lucide-react";
 
 import type { Client, Device, Role } from "@prisma/client";
 import type { HealthResult } from "@/lib/health/score";
-import { BAND_HEX } from "@/lib/health/bands";
 import { DevicesTab } from "@/components/app/devices/DevicesTab";
-import { PatchAgeChart } from "@/components/charts/PatchAgeChart";
-import { ScoreHistoryChart } from "@/components/charts/ScoreHistoryChart";
-import type { SnapshotPoint } from "@/components/charts/ScoreHistoryChart";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +28,6 @@ interface ClientDetailPageProps {
   role: Role;
   activeTab: string;
   health: HealthResult;
-  snapshots: SnapshotPoint[];
 }
 
 const SLA_VARIANTS: Record<
@@ -86,7 +81,6 @@ export function ClientDetailPage({
   role,
   activeTab,
   health,
-  snapshots,
 }: ClientDetailPageProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
@@ -96,22 +90,6 @@ export function ClientDetailPage({
   const canWrite = role !== "READONLY";
 
   const currentTab = VALID_TABS.includes(activeTab) ? activeTab : "overview";
-
-  // Patch age buckets derived from device data — pure computation, no fetch.
-  const patchBuckets = { current: 0, aging: 0, stale: 0, unknown: 0 };
-  for (const d of devices) {
-    const days = d.patchAgeDays as number | null;
-    if (days === null) patchBuckets.unknown++;
-    else if (days <= 30) patchBuckets.current++;
-    else if (days <= 90) patchBuckets.aging++;
-    else patchBuckets.stale++;
-  }
-  const patchAgeData = [
-    { bucket: "≤ 30d", count: patchBuckets.current, fill: BAND_HEX.HEALTHY },
-    { bucket: "31–90d", count: patchBuckets.aging, fill: BAND_HEX.AT_RISK },
-    { bucket: "> 90d", count: patchBuckets.stale, fill: BAND_HEX.CRITICAL },
-    { bucket: "Unknown", count: patchBuckets.unknown, fill: "#94a3b8" },
-  ];
 
   function handleTabChange(value: string | number | null) {
     if (typeof value === "string") {
@@ -267,28 +245,39 @@ export function ClientDetailPage({
 
         {/* Reports */}
         <TabsContent value="reports">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Device Patch Age
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <PatchAgeChart data={patchAgeData} total={devices.length} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Score History
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <ScoreHistoryChart data={snapshots} />
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Health Report</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Download a PDF summary of this client&apos;s health score,
+                device status, and recent audit activity for the current month.
+              </p>
+              {canWrite ? (
+                <a
+                  href={`/api/reports/${client.id}/monthly`}
+                  download
+                  className="inline-flex w-fit"
+                >
+                  <Button className="gap-1.5">
+                    <DownloadIcon className="h-4 w-4" />
+                    Download Report
+                  </Button>
+                </a>
+              ) : (
+                <span
+                  title="Read-only users cannot download reports"
+                  className="inline-flex w-fit cursor-not-allowed"
+                >
+                  <Button disabled className="pointer-events-none gap-1.5">
+                    <DownloadIcon className="h-4 w-4" />
+                    Download Report
+                  </Button>
+                </span>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

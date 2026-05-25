@@ -37,10 +37,10 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users            User[]
-  clients          Client[]
-  auditLogs        AuditLog[]
-  healthSnapshots  HealthSnapshot[]
+  users      User[]
+  clients    Client[]
+  auditLogs  AuditLog[]
+  alertLogs  AlertLog[]
 
   @@map("organizations")
 }
@@ -78,8 +78,7 @@ model Client {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  devices          Device[]
-  healthSnapshots  HealthSnapshot[]
+  devices Device[]
 
   @@index([organizationId])
   @@map("clients")
@@ -105,30 +104,19 @@ model Device {
   @@map("devices")
 }
 
-/// Daily health snapshot — one row per client per calendar day.
-/// Written by the Vercel Cron job at /api/cron/health-snapshot (an admin
-/// service-role job that crosses org boundaries intentionally — see that file).
-/// Unique on (clientId, date) so re-running the cron on the same day is idempotent.
-model HealthSnapshot {
+/// Tracks sent alert emails to prevent duplicate alerts within a 7-day window.
+model AlertLog {
   id             String       @id @default(cuid())
-  clientId       String       @map("client_id")
-  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   organizationId String       @map("organization_id")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  /// Calendar date (no time component) — Postgres `date` type.
-  date           DateTime     @db.Date
-  score          Int
-  /// CRITICAL | AT_RISK | FAIR | HEALTHY
-  band           String
-  /// Component sub-scores — nullable so new components can be added without a migration.
-  patchScore     Int?         @map("patch_score")
-  coverageScore  Int?         @map("coverage_score")
-  createdAt      DateTime     @default(now())
+  entityType     String       @map("entity_type") // "device" | "client"
+  entityId       String       @map("entity_id")
+  alertType      String       @map("alert_type")  // "patch_age" | "health_critical"
+  sentAt         DateTime     @default(now()) @map("sent_at")
 
-  @@unique([clientId, date])
   @@index([organizationId])
-  @@index([clientId])
-  @@map("health_snapshots")
+  @@index([entityType, entityId, alertType, sentAt])
+  @@map("alert_logs")
 }
 
 /// Immutable append-only record written on every mutation.

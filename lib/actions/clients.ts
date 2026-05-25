@@ -50,6 +50,7 @@ export async function createClient(rawData: unknown): Promise<CreateClientResult
   });
 
   revalidatePath("/clients");
+  revalidatePath("/dashboard");
   return { success: true, client };
 }
 
@@ -112,6 +113,7 @@ export async function updateClient(
 
   revalidatePath("/clients");
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -150,5 +152,6 @@ export async function deleteClient(clientId: string): Promise<DeleteClientResult
   });
 
   revalidatePath("/clients");
+  revalidatePath("/dashboard");
   return { success: true };
 }

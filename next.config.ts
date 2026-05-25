@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // recharts uses browser globals (ResizeObserver, window) that aren't
-  // available during SSR; transpiling it through Next.js avoids the crash.
-  transpilePackages: ["recharts"],
+  serverExternalPackages: ["@react-pdf/renderer"],
 };
 
 export default nextConfig;

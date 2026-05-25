@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { getBaseUrl } from "@/lib/utils/get-base-url";
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -56,7 +55,10 @@ export function ForgotPasswordForm() {
   async function onSubmit(values: FormValues) {
     const supabase = createBrowserSupabaseClient();
 
-    const redirectTo = `${getBaseUrl()}/auth/callback?next=/reset-password`;
+    // Use window.location.origin so the redirectTo URL always matches the
+    // current environment (localhost in dev, production URL in prod) without
+    // depending on an env var being set correctly in the browser bundle.
+    const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password`;
 
     await supabase.auth.resetPasswordForEmail(values.email, { redirectTo });
 
