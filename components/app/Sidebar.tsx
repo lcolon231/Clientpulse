@@ -22,7 +22,7 @@ const navItems = [
   { label: "Devices", href: "/clients", icon: Monitor },
   { label: "Reports", href: "/coming-soon", icon: BarChart3 },
   { label: "Billing", href: "/billing", icon: CreditCardIcon },
-  { label: "Settings", href: "/coming-soon", icon: Settings },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 // ---------------------------------------------------------------------------

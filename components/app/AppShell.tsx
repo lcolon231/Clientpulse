@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { SignOutButton } from "@/components/app/SignOutButton";
 import { SidebarNav } from "@/components/app/Sidebar";
+import { NotificationBell } from "@/components/app/NotificationBell";
 import { Toaster } from "@/components/ui/toast";
 import { Toaster as SonnerToaster } from "sonner";
 
@@ -37,6 +38,7 @@ interface AppShellProps {
   orgName: string;
   userName: string | null;
   userEmail: string;
+  initialUnreadCount: number;
   children: React.ReactNode;
 }
 
@@ -62,6 +64,7 @@ export function AppShell({
   orgName,
   userName,
   userEmail,
+  initialUnreadCount,
   children,
 }: AppShellProps) {
   const initials = getInitials(userName, userEmail);
@@ -108,8 +111,9 @@ export function AppShell({
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* User avatar + logout */}
+        {/* Notification bell + user avatar + logout */}
         <div className="flex items-center gap-2">
+          <NotificationBell initialUnreadCount={initialUnreadCount} />
           <Avatar size="sm">
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>

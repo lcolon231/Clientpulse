@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { calculateHealth } from "@/lib/health/score";
 import { resend } from "@/lib/resend";
 import { clientEnv } from "@/lib/env";
+import { createNotification } from "@/lib/notifications";
 
 const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const PATCH_AGE_THRESHOLD = 30; // days
@@ -132,6 +133,12 @@ export async function checkAndSendAlerts(): Promise<AlertCheckResult> {
           });
 
           await recordAlert(org.id, "device", device.id, "patch_age");
+          await createNotification(
+            org.id,
+            "Patch Age Alert",
+            `${device.hostname} (${client.name}) has not been patched in ${device.patchAgeDays} days.`,
+            `${clientEnv.NEXT_PUBLIC_SITE_URL}/clients/${client.id}`,
+          );
           sent++;
         } catch (err) {
           errors.push(
@@ -176,6 +183,12 @@ export async function checkAndSendAlerts(): Promise<AlertCheckResult> {
         });
 
         await recordAlert(org.id, "client", client.id, "health_critical");
+        await createNotification(
+          org.id,
+          "Critical Health Alert",
+          `${client.name} health score dropped to CRITICAL (${health.score}).`,
+          `${clientEnv.NEXT_PUBLIC_SITE_URL}/clients/${client.id}`,
+        );
         sent++;
       } catch (err) {
         errors.push(
