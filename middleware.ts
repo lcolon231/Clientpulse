@@ -9,6 +9,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * Paths that don't require authentication (unauthenticated users may visit).
  */
 const PUBLIC_PATHS = [
+  "/",              // landing page — no auth required
   "/login",
   "/signup",
   "/forgot-password",
@@ -46,7 +47,7 @@ function shouldRedirectAuthedUser(pathname: string): boolean {
 // Middleware
 // ---------------------------------------------------------------------------
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   /**
    * Why we build the Supabase client here instead of importing createServerSupabaseClient:
    *
@@ -76,9 +77,6 @@ export async function proxy(request: NextRequest) {
         setAll(cookiesToSet) {
           // Step 1: write onto the mutated request so server code in this
           // request cycle sees the refreshed token.
-          // Request cookies carry only name+value — security attributes
-          // (httpOnly, secure, sameSite) belong on the response Set-Cookie
-          // header, not the incoming request.
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
