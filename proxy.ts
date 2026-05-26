@@ -47,7 +47,7 @@ function shouldRedirectAuthedUser(pathname: string): boolean {
 // Middleware
 // ---------------------------------------------------------------------------
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   /**
    * Why we build the Supabase client here instead of importing createServerSupabaseClient:
    *
