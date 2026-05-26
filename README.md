@@ -16,6 +16,7 @@ ClientPulse is a multi-tenant SaaS dashboard built for Managed Service Providers
 | Validation | Zod (schema-first, shared between client and server) |
 | Forms | react-hook-form + @hookform/resolvers/zod |
 | CSV parsing | Papaparse |
+| Billing | Stripe (Checkout, Billing Portal, Webhooks) |
 | Package manager | pnpm |
 | Deploy target | Vercel |
 
@@ -45,7 +46,9 @@ pnpm install
 cp .env.example .env.local
 ```
 
-Open `.env.local` and fill in all six values:
+Open `.env.local` and fill in all values:
+
+**Supabase / core**
 
 | Variable | Where to find it |
 |---|---|
@@ -55,6 +58,23 @@ Open `.env.local` and fill in all six values:
 | `NEXT_PUBLIC_SUPABASE_URL` | Project Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API → **anon / public** key |
 | `NEXT_PUBLIC_SITE_URL` | Set to `http://localhost:3000` for local dev |
+
+**Reports & alerts (Week 5)**
+
+| Variable | Where to find it |
+|---|---|
+| `RESEND_API_KEY` | [resend.com/api-keys](https://resend.com/api-keys) |
+| `CRON_SECRET` | Generate with `openssl rand -hex 32`; set the same value in Vercel project settings |
+
+**Billing (Week 6)**
+
+| Variable | Where to find it |
+|---|---|
+| `STRIPE_SECRET_KEY` | Stripe Dashboard → Developers → API keys → Secret key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe Dashboard → Developers → Webhooks → your endpoint → Signing secret |
+| `STRIPE_PRICE_STARTER` | Stripe Dashboard → Products → your Starter product → Price ID |
+| `STRIPE_PRICE_GROWTH` | Stripe Dashboard → Products → your Growth product → Price ID |
+| `STRIPE_PRICE_ENTERPRISE` | Stripe Dashboard → Products → your Enterprise product → Price ID |
 
 ### 4. Push the Prisma schema
 
@@ -68,14 +88,17 @@ pnpm db:push
 
 > **Week 3 note:** If you are upgrading an existing deployment that already has the `clients` table from Week 1–2, `db:push` will add the five new columns (`industry`, `primary_contact`, `primary_contact_email`, `sla_tier`, `notes`) non-destructively. All new columns are nullable except `sla_tier`, which defaults to `BASIC`.
 
-### 5. Apply the RLS migrations
+### 5. Apply the manual migrations
 
-The Prisma schema creates tables but does not enable Row-Level Security. Apply both hand-written migrations manually:
+The Prisma schema creates tables but does not enable Row-Level Security, and does not add the Stripe billing columns. Apply all hand-written migrations in order:
 
 1. Open your Supabase project → **SQL Editor**
-2. Paste and run `prisma/migrations/manual/001_rls_policies.sql`
-3. Paste and run `prisma/migrations/manual/002_rls_organizations_users.sql`
-4. Run the verification queries at the bottom of each file to confirm everything is in place
+2. Paste and run each file in order:
+   - `prisma/migrations/manual/001_rls_policies.sql`
+   - `prisma/migrations/manual/002_rls_organizations_users.sql`
+   - `prisma/migrations/manual/003_alert_logs.sql`
+   - `prisma/migrations/manual/004_stripe_billing.sql`
+3. Run the verification queries at the bottom of each file to confirm everything is in place
 
 ### 6. Activate the Custom Access Token Hook
 
@@ -177,6 +200,37 @@ pnpm format:check # Prettier
 /types               Shared TypeScript types
 /docs                Test plans and technical reference
 ```
+
+---
+
+## Billing & subscriptions (Week 6)
+
+ClientPulse uses Stripe for subscription management. Three plans are available:
+
+| Plan | Clients | Devices | CSV Import | Scheduled Reports |
+|---|---|---|---|---|
+| Starter (free) | 10 | 50 | — | — |
+| Growth | 50 | 500 | Yes | Yes |
+| Enterprise | Unlimited | Unlimited | Yes | Yes |
+
+### How it works
+
+- **`lib/plans.ts`** — `PLAN_LIMITS`, `canAddClient`, `canAddDevice`, `canUseFeature` are the single source of truth for all plan enforcement
+- **`/billing`** — shows current plan, usage bars, plan cards with Subscribe / Current Plan buttons, and a Manage Billing button (when a Stripe customer exists)
+- **`/api/billing/checkout`** — creates or retrieves the Stripe customer, then starts a hosted Checkout session in `subscription` mode
+- **`/api/billing/portal`** — creates a Billing Portal session so customers can update payment methods or cancel
+- **`/api/webhooks/stripe`** — handles `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`; verifies the Stripe signature before processing
+- **Feature gating** — `createClient` and `createDevice` server actions check plan limits before inserting; `bulkCreateDevices` blocks CSV import on Starter and caps imports at the remaining device capacity with a warning; the monthly-reports cron skips orgs without `scheduled_reports`
+- **UI gating** — the dashboard shows an approaching-limit banner within 2 clients or 10 devices of the plan ceiling; the CSV Import button is disabled with a tooltip on Starter; the Add Client button is disabled at the limit
+
+### Local Stripe testing
+
+```bash
+# Install the Stripe CLI, then forward webhooks to your local server
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+Copy the webhook signing secret printed by the CLI into `STRIPE_WEBHOOK_SECRET` in `.env.local`.
 
 ---
 
@@ -289,9 +343,10 @@ web-01,Server,Ubuntu,22.04,2025-05-15,5,"Server,Network"
 | 1 | Foundation — schema, RLS, auth (signup / login / logout), dashboard placeholder | Done |
 | 2 | Auth & Tenancy — password reset, invite flow, role system, dashboard layout | Done |
 | 3 | Clients & Devices CRUD — client list/detail, device table, CSV import, tag system, audit log | Done |
-| 4 | Health scoring — patch-age scoring, device health snapshot table, Recharts dashboard | Planned |
-| 5 | Reports — PDF generation, scheduled email reports | Planned |
-| 6 | Ticket integration — ConnectWise / Autotask read-only feed | Planned |
-| 7 | Backup status aggregation | Planned |
-| 8 | SLA metrics and threshold alerting | Planned |
-| 9 | Role management UI + audit log viewer | Planned |
+| 4 | Health scoring — patch-age scoring, Recharts dashboard (activity, device health, SLA charts) | Done |
+| 5 | Reports & Alerts — PDF monthly reports, scheduled email via Resend, threshold alert emails | Done |
+| 6 | Billing & Subscriptions — Stripe plans (Starter/Growth/Enterprise), feature gating, usage UI | Done |
+| 7 | Ticket integration — ConnectWise / Autotask read-only feed | Planned |
+| 8 | Backup status aggregation | Planned |
+| 9 | SLA metrics and threshold alerting | Planned |
+| 10 | Role management UI + audit log viewer | Planned |
