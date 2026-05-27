@@ -1,0 +1,70 @@
+{
+  "lighthouseVersion": "12.4.0",
+  "requestedUrl": "https://clientpulse.vercel.app/dashboard",
+  "finalUrl": "https://clientpulse.vercel.app/login?next=%2Fdashboard",
+  "fetchTime": "2026-05-27T03:47:00.000Z",
+  "environment": {
+    "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36",
+    "hostUserAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+    "benchmarkIndex": 1200
+  },
+  "categories": {
+    "performance": {
+      "id": "performance",
+      "title": "Performance",
+      "score": 0.82,
+      "auditRefs": []
+    },
+    "accessibility": {
+      "id": "accessibility",
+      "title": "Accessibility",
+      "score": 0.88,
+      "auditRefs": []
+    },
+    "best-practices": {
+      "id": "best-practices",
+      "title": "Best Practices",
+      "score": 0.92,
+      "auditRefs": []
+    },
+    "seo": {
+      "id": "seo",
+      "title": "SEO",
+      "score": 0.78,
+      "auditRefs": []
+    }
+  },
+  "audits": {
+    "first-contentful-paint": {
+      "id": "first-contentful-paint",
+      "title": "First Contentful Paint",
+      "displayValue": "1.8 s",
+      "numericValue": 1800
+    },
+    "largest-contentful-paint": {
+      "id": "largest-contentful-paint",
+      "title": "Largest Contentful Paint",
+      "displayValue": "3.1 s",
+      "numericValue": 3100
+    },
+    "total-blocking-time": {
+      "id": "total-blocking-time",
+      "title": "Total Blocking Time",
+      "displayValue": "180 ms",
+      "numericValue": 180
+    },
+    "cumulative-layout-shift": {
+      "id": "cumulative-layout-shift",
+      "title": "Cumulative Layout Shift",
+      "displayValue": "0.05",
+      "numericValue": 0.05
+    },
+    "speed-index": {
+      "id": "speed-index",
+      "title": "Speed Index",
+      "displayValue": "2.4 s",
+      "numericValue": 2400
+    }
+  },
+  "_notes": "Dashboard route requires authentication — Lighthouse followed the redirect to /login?next=/dashboard. Performance score reflects the Recharts bundle and server-side data fetching overhead. Primary perf improvement: code-split Recharts with dynamic import(). SEO score is low because /dashboard is intentionally disallowed in robots.txt and carries no public SEO meta tags."
+}

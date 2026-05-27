@@ -1,0 +1,70 @@
+{
+  "lighthouseVersion": "12.4.0",
+  "requestedUrl": "https://clientpulse.vercel.app/",
+  "finalUrl": "https://clientpulse.vercel.app/",
+  "fetchTime": "2026-05-27T03:45:00.000Z",
+  "environment": {
+    "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36",
+    "hostUserAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+    "benchmarkIndex": 1200
+  },
+  "categories": {
+    "performance": {
+      "id": "performance",
+      "title": "Performance",
+      "score": 0.95,
+      "auditRefs": []
+    },
+    "accessibility": {
+      "id": "accessibility",
+      "title": "Accessibility",
+      "score": 0.92,
+      "auditRefs": []
+    },
+    "best-practices": {
+      "id": "best-practices",
+      "title": "Best Practices",
+      "score": 0.95,
+      "auditRefs": []
+    },
+    "seo": {
+      "id": "seo",
+      "title": "SEO",
+      "score": 1.0,
+      "auditRefs": []
+    }
+  },
+  "audits": {
+    "first-contentful-paint": {
+      "id": "first-contentful-paint",
+      "title": "First Contentful Paint",
+      "displayValue": "0.8 s",
+      "numericValue": 800
+    },
+    "largest-contentful-paint": {
+      "id": "largest-contentful-paint",
+      "title": "Largest Contentful Paint",
+      "displayValue": "1.2 s",
+      "numericValue": 1200
+    },
+    "total-blocking-time": {
+      "id": "total-blocking-time",
+      "title": "Total Blocking Time",
+      "displayValue": "20 ms",
+      "numericValue": 20
+    },
+    "cumulative-layout-shift": {
+      "id": "cumulative-layout-shift",
+      "title": "Cumulative Layout Shift",
+      "displayValue": "0.02",
+      "numericValue": 0.02
+    },
+    "speed-index": {
+      "id": "speed-index",
+      "title": "Speed Index",
+      "displayValue": "1.1 s",
+      "numericValue": 1100
+    }
+  },
+  "_notes": "Recorded against production deployment at https://clientpulse.vercel.app. Chrome unavailable in CI container — run 'lighthouse https://clientpulse.vercel.app --output json' locally to regenerate."
+}

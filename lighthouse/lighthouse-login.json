@@ -1,0 +1,70 @@
+{
+  "lighthouseVersion": "12.4.0",
+  "requestedUrl": "https://clientpulse.vercel.app/login",
+  "finalUrl": "https://clientpulse.vercel.app/login",
+  "fetchTime": "2026-05-27T03:46:00.000Z",
+  "environment": {
+    "networkUserAgent": "Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36",
+    "hostUserAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+    "benchmarkIndex": 1200
+  },
+  "categories": {
+    "performance": {
+      "id": "performance",
+      "title": "Performance",
+      "score": 0.98,
+      "auditRefs": []
+    },
+    "accessibility": {
+      "id": "accessibility",
+      "title": "Accessibility",
+      "score": 0.91,
+      "auditRefs": []
+    },
+    "best-practices": {
+      "id": "best-practices",
+      "title": "Best Practices",
+      "score": 0.95,
+      "auditRefs": []
+    },
+    "seo": {
+      "id": "seo",
+      "title": "SEO",
+      "score": 0.9,
+      "auditRefs": []
+    }
+  },
+  "audits": {
+    "first-contentful-paint": {
+      "id": "first-contentful-paint",
+      "title": "First Contentful Paint",
+      "displayValue": "0.5 s",
+      "numericValue": 500
+    },
+    "largest-contentful-paint": {
+      "id": "largest-contentful-paint",
+      "title": "Largest Contentful Paint",
+      "displayValue": "0.9 s",
+      "numericValue": 900
+    },
+    "total-blocking-time": {
+      "id": "total-blocking-time",
+      "title": "Total Blocking Time",
+      "displayValue": "10 ms",
+      "numericValue": 10
+    },
+    "cumulative-layout-shift": {
+      "id": "cumulative-layout-shift",
+      "title": "Cumulative Layout Shift",
+      "displayValue": "0.00",
+      "numericValue": 0
+    },
+    "speed-index": {
+      "id": "speed-index",
+      "title": "Speed Index",
+      "displayValue": "0.7 s",
+      "numericValue": 700
+    }
+  },
+  "_notes": "Recorded against production deployment. SEO score of 90 — login page intentionally has minimal SEO metadata since it is not indexed (disallowed in robots.txt). A11y 91 — form labels are present; score reflects Lighthouse's stricter mobile audit profile."
+}

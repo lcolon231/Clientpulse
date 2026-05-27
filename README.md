@@ -1,344 +1,159 @@
 # ClientPulse
 
-ClientPulse is a multi-tenant SaaS dashboard built for Managed Service Providers (MSPs) to monitor the health of their small-business clients from a single pane of glass. Each MSP organisation sees only its own data — ticket queues, device health, backup status, and SLA metrics — enforced at the database layer via Postgres Row-Level Security rather than application-level filtering. Built by NodeLink Technologies as both a production internal tool and a portfolio flagship.
+**Multi-tenant MSP client health dashboard** — monitor device patch status, SLA compliance, and client health scores from a single pane of glass.
+
+**[Live Demo](https://clientpulse.vercel.app)** · [Case Study](https://clientpulse.vercel.app/case-study)
+
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ECF8E?logo=supabase)
+![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma)
+![Tailwind](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss)
+![Stripe](https://img.shields.io/badge/Stripe-Billing-635BFF?logo=stripe)
+![Vercel](https://img.shields.io/badge/Vercel-Deploy-000000?logo=vercel)
 
 ---
 
-## Stack
+## What is ClientPulse?
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router, TypeScript strict) |
-| Styling | Tailwind CSS v4 + shadcn/ui (base-nova style) |
-| Auth | Supabase Auth (email/password, PKCE flow) |
-| Database | Supabase Postgres with Row-Level Security |
-| ORM | Prisma (transaction-mode pooler at runtime, direct URL for migrations) |
-| Validation | Zod (schema-first, shared between client and server) |
-| Forms | react-hook-form + @hookform/resolvers/zod |
-| CSV parsing | Papaparse |
-| Billing | Stripe (Checkout, Billing Portal, Webhooks) |
-| Package manager | pnpm |
-| Deploy target | Vercel |
+Managed Service Providers manage dozens of small-business clients simultaneously — keeping their workstations patched, their servers healthy, and their SLA agreements met. The existing tools (ConnectWise, Kaseya, Autotask) cost thousands of dollars per month and take weeks to onboard. Smaller MSPs pay for functionality they'll never use while drowning in dashboards that weren't designed with them in mind.
+
+ClientPulse is a focused, purpose-built alternative. It gives an MSP technician a single screen that answers the three questions they ask every morning: which clients are healthy, which devices are falling behind on patches, and which SLA tiers are at risk. Health scores are calculated automatically from device patch age data and surfaced in real-time on the dashboard. When a client drops to CRITICAL, an alert email goes out — once, with a 7-day dedup window so you're not flooded.
+
+The architecture prioritises correctness of the multi-tenancy boundary above everything else. Each MSP organisation is completely isolated at the Postgres row level — no application-level WHERE clause required, no risk of accidentally leaking a client's data to another tenant. Row-Level Security policies enforced by the database are the only reliable tenant boundary; this project demonstrates how to implement that correctly with Supabase Auth, a custom JWT hook, and Prisma as the ORM.
 
 ---
 
-## Local dev setup
+## Features
 
-Follow every step in order. Skipping the Supabase configuration steps will result in empty tables (RLS silently denies all rows when the JWT claim is missing).
+### Auth & Multi-tenancy
+- Email/password sign-up creates an Organisation + Owner atomically
+- Invite-by-email flow for adding Technicians and Read-Only users
+- Password reset via PKCE — code verifier stays in the browser, never touches the server
+- Row-Level Security on all tables — the database enforces tenant isolation, not application code
+- Custom Access Token Hook injects `org_id` into every JWT, enabling RLS without extra round-trips
+- Three roles: **OWNER** (full access), **TECHNICIAN** (read + write), **READ_ONLY** (read only)
 
-### 1. Prerequisites
+### Client & Device Management
+- Searchable, filterable client list with SLA tier badges and health scores
+- Client detail page with tabs: Overview, Devices, Tickets (placeholder), Reports
+- Full device CRUD: hostname, type, OS, OS version, patch age, last seen, tags
+- CSV import with client-side validation — invalid rows highlighted before submit
+- Tag system with colour-coded badges (Server, Workstation, Laptop, Network, Firewall, NAS)
+- Immutable audit log on every mutation (7 action types, JSON metadata)
+
+### Health Scoring
+- Score 0–100 calculated from patch age distribution across a client's devices
+- Three bands: **Healthy** (80–100), **Needs Attention** (60–79), **Critical** (<60)
+- Org-level health map used in dashboard client cards and client list badges
+- Recharts visualisations: health distribution donut, patch age bar chart, SLA distribution
+
+### Reporting
+- Monthly PDF health reports via `@react-pdf/renderer`
+- Scheduled email delivery via Resend (Vercel Cron, 1st of each month)
+- Download Report button on client detail page (role-gated, OWNER + TECHNICIAN)
+
+### Billing
+- Three plans: **STARTER** ($29/mo), **GROWTH** ($79/mo), **ENTERPRISE** ($199/mo)
+- Stripe Checkout for new subscriptions, Stripe Customer Portal for management
+- Webhook handler processes `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+- Plan limits enforced in server actions and cron (client/device count caps)
+
+### Notifications & Alerts
+- In-app notification bell with unread count badge
+- Threshold alerts: CRITICAL health and stale patch age trigger one email per 7 days
+- Alert dedup tracked via AuditLog — no duplicate floods
+
+### Infrastructure
+- Rate limiting via Upstash Redis (sliding window, 10 req/10s) on auth and mutation routes
+- Structured logging with Pino (pino-pretty in dev, JSON in prod)
+- Global and route-level error boundaries with styled "Try again" reset
+- `app/sitemap.ts` and `app/robots.ts` for SEO
+- CI/CD: three parallel GitHub Actions jobs (typecheck, lint, build) on every PR
+- 4-step onboarding wizard for new organisations
+- `/settings` with Profile, Team, and Billing tabs
+- Public marketing landing page with pricing, features, and CTA sections
+
+---
+
+## Architecture Decisions
+
+| Decision | Choice | Why | What I'd reconsider at scale |
+|---|---|---|---|
+| **Auth** | Supabase Auth | Handles email/password, magic links, OAuth, and invite flows out of the box. The PKCE implementation is correct by default, which is hard to get right from scratch. | At >100k users, migrating off Supabase Auth is painful. Would evaluate Auth0 or a self-hosted Keycloak deployment for enterprises that need SAML/SSO. |
+| **ORM** | Prisma 7 | TypeScript-first schema, excellent migration tooling, driver adapter pattern works well with Supabase's pgBouncer. `prisma.$transaction` gives atomic multi-table writes without raw SQL. | Prisma's query engine adds latency compared to raw SQL for complex joins. At scale, would use Drizzle (zero-overhead, type-safe SQL) or keep Prisma but move hot paths to `$queryRaw`. |
+| **PDF generation** | @react-pdf/renderer | Server-side PDF generation with a React component model. No browser dependency, no headless Chrome, no external service. | react-pdf runs synchronously and blocks the Node.js thread for large documents (~200ms per report). At scale, move to a queue (BullMQ / Inngest) so cron doesn't time out on large orgs. |
+| **Email delivery** | Resend | Simple REST API, excellent React Email integration, generous free tier. Zero infrastructure to manage. | Single vendor dependency. At scale, add a fallback (SES/Postmark) and an outbox pattern so failed sends can be retried without re-running the cron job. |
+| **Cron** | Vercel Cron | Zero infrastructure — declare cron schedule in `vercel.json`, Vercel calls the route. | Vercel Cron has a 25-second execution limit per invocation. For large orgs with many clients, the report generation loop would need to be chunked across multiple invocations or moved to a proper queue. |
+| **Rate limiting** | Upstash Redis | Serverless-native Redis with REST API — works in Edge Runtime and Node.js alike. Sliding window algorithm is fair and predictable. Fail-open on Redis error keeps the app available. | Upstash free tier is 10k commands/day. At production scale, need a paid tier or self-hosted Valkey. Also: per-IP rate limiting is easily bypassed with IPv6 rotation; would add user-ID-based limiting for authenticated routes. |
+
+---
+
+## Local Dev Setup
+
+Follow every step in order. Skipping the Supabase steps results in empty tables — RLS silently denies all rows when the JWT `org_id` claim is missing.
+
+### Prerequisites
 
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - A [Supabase](https://supabase.com) project (free tier is fine)
+- A [Stripe](https://stripe.com) account (test mode)
 
-### 2. Clone and install
+### 1. Clone and install
 
 ```bash
-git clone <your-repo-url> clientpulse
+git clone https://github.com/lcolon231/Clientpulse.git clientpulse
 cd clientpulse
 pnpm install
 ```
 
-### 3. Configure environment variables
+### 2. Configure environment variables
 
 ```bash
 cp .env.example .env.local
 ```
 
-Open `.env.local` and fill in all values:
+Fill in all values — see the [Environment Variables](#environment-variables) table below.
 
-**Supabase / core**
-
-| Variable | Where to find it |
-|---|---|
-| `DATABASE_URL` | Project Settings → Database → Connection string → **Transaction** (port 6543) |
-| `DIRECT_URL` | Project Settings → Database → Connection string → **Direct** (port 5432) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → **service_role** key |
-| `NEXT_PUBLIC_SUPABASE_URL` | Project Settings → API → Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API → **anon / public** key |
-| `NEXT_PUBLIC_SITE_URL` | Set to `http://localhost:3000` for local dev |
-
-**Reports & alerts (Week 5)**
-
-| Variable | Where to find it |
-|---|---|
-| `RESEND_API_KEY` | [resend.com/api-keys](https://resend.com/api-keys) |
-| `CRON_SECRET` | Generate with `openssl rand -hex 32`; set the same value in Vercel project settings |
-
-**Billing (Week 6)**
-
-| Variable | Where to find it |
-|---|---|
-| `STRIPE_SECRET_KEY` | Stripe Dashboard → Developers → API keys → Secret key |
-| `STRIPE_WEBHOOK_SECRET` | Stripe Dashboard → Developers → Webhooks → your endpoint → Signing secret |
-| `STRIPE_PRICE_STARTER` | Stripe Dashboard → Products → your Starter product → Price ID |
-| `STRIPE_PRICE_GROWTH` | Stripe Dashboard → Products → your Growth product → Price ID |
-| `STRIPE_PRICE_ENTERPRISE` | Stripe Dashboard → Products → your Enterprise product → Price ID |
-
-**PSA ticket sync (Week 7)**
-
-| Variable | Where to find it |
-|---|---|
-| `PSA_SYNC_ORGANIZATION_ID` | ClientPulse organization ID; required when more than one org exists |
-| `TICKET_SYNC_LOOKBACK_DAYS` | Number of days fetched per sync run; defaults to `30` |
-| `CONNECTWISE_BASE_URL` | ConnectWise Manage API host, e.g. `https://api-na.myconnectwise.net` |
-| `CONNECTWISE_COMPANY_ID` | ConnectWise company identifier |
-| `CONNECTWISE_PUBLIC_KEY` | ConnectWise API member public key |
-| `CONNECTWISE_PRIVATE_KEY` | ConnectWise API member private key |
-| `CONNECTWISE_CLIENT_ID` | ConnectWise developer client ID |
-| `AUTOTASK_BASE_URL` | Autotask REST API base URL |
-| `AUTOTASK_USERNAME` | Autotask API username |
-| `AUTOTASK_SECRET` | Autotask API secret |
-| `AUTOTASK_INTEGRATION_CODE` | Autotask API integration code |
-
-### 4. Push the Prisma schema
-
-This creates all five tables (`organizations`, `users`, `clients`, `devices`, `audit_logs`) and the `SlaTier` enum in your Supabase project:
+### 3. Push the database schema
 
 ```bash
 pnpm db:push
 ```
 
-> Prisma uses `DIRECT_URL` (port 5432) for this operation — the transaction pooler does not support DDL statements.
+This creates all tables (`organizations`, `users`, `clients`, `devices`, `audit_logs`) and the `SlaTier` enum. Prisma uses `DIRECT_URL` (port 5432) for DDL — pgBouncer (6543) does not support DDL.
 
-> **Week 3 note:** If you are upgrading an existing deployment that already has the `clients` table from Week 1–2, `db:push` will add the five new columns (`industry`, `primary_contact`, `primary_contact_email`, `sla_tier`, `notes`) non-destructively. All new columns are nullable except `sla_tier`, which defaults to `BASIC`.
+### 4. Apply the RLS migrations
 
-### 5. Apply the manual migrations
+Prisma creates tables but does not enable Row-Level Security. Apply both migrations manually:
 
-The Prisma schema creates tables but does not enable Row-Level Security, and does not add the Stripe billing columns. Apply all hand-written migrations in order:
+1. Supabase Dashboard → **SQL Editor**
+2. Paste and run `prisma/migrations/manual/001_rls_policies.sql`
+3. Paste and run `prisma/migrations/manual/002_rls_organizations_users.sql`
 
-1. Open your Supabase project → **SQL Editor**
-2. Paste and run each file in order:
-   - `prisma/migrations/manual/001_rls_policies.sql`
-   - `prisma/migrations/manual/002_rls_organizations_users.sql`
-   - `prisma/migrations/manual/003_alert_logs.sql`
-   - `prisma/migrations/manual/004_stripe_billing.sql`
-   - `prisma/migrations/manual/005_week7_schema.sql`
-   - `prisma/migrations/manual/006_tickets_readonly_feed.sql`
-3. Run the verification queries at the bottom of each file to confirm everything is in place
+### 5. Activate the Custom Access Token Hook
 
-### 6. Activate the Custom Access Token Hook
-
-Without this step, the `org_id` claim will be missing from every JWT and all RLS policies will silently deny every row.
+Without this step, `org_id` is missing from every JWT and RLS silently denies all rows.
 
 1. Supabase Dashboard → **Authentication → Hooks**
 2. Under **Custom Access Token**, select `public.custom_access_token_hook`
-3. Click **Save**
-
-### 7. Configure auth email redirect URLs
-
-The password reset and invite flows send emails with links back to your app. Supabase validates the redirect URL against an allowlist.
-
-1. Supabase Dashboard → **Authentication → URL Configuration**
-2. Under **Redirect URLs**, add `http://localhost:3000/auth/callback`
-3. For production, also add `https://your-app.vercel.app/auth/callback`
-
-> Without this step, password reset and invite emails will fail with a "redirect_uri_mismatch" error.
-
-### 8. Disable email confirmation (development only)
-
-By default Supabase requires email confirmation before a new account is active. For local development, disable it:
-
-1. Supabase Dashboard → **Authentication → Providers → Email**
-2. Toggle **Confirm email** off
 3. Save
 
-> Re-enable this before going to production.
+### 6. Configure auth redirect URLs
 
-### 9. Run the dev server
+1. Supabase Dashboard → **Authentication → URL Configuration → Redirect URLs**
+2. Add `http://localhost:3000/auth/callback`
+
+### 7. Run the dev server
 
 ```bash
 pnpm dev
 ```
 
-Visit `http://localhost:3000/signup`, create an account, and confirm you land on `/dashboard` showing your organisation name and the full app layout.
+Visit `http://localhost:3000` — the marketing landing page. Click **Get Started** to sign up.
 
-### 10. Verify (optional)
-
-```bash
-pnpm type-check   # TypeScript — should produce no errors
-pnpm lint         # ESLint
-pnpm format:check # Prettier
-```
-
----
-
-## Project structure
-
-```
-/app
-  /(auth)            Public auth routes (no session required)
-    /login           Sign-in page with "Forgot password?" link
-    /signup          New org registration (atomic org + user transaction)
-    /forgot-password Request password reset email
-    /reset-password  Set new password (after clicking reset link)
-    /accept-invite   Complete invite setup (display name + password)
-  /(app)             Session-required routes — all wrapped by AppShell
-    /dashboard       Main dashboard: empty-state card + Invite Technician (owner only)
-    /clients         Client list — search, SLA filter, Add Client modal
-      /[id]          Client detail — Overview / Devices / Tickets / Reports tabs
-    /coming-soon     Placeholder for sidebar nav links not yet built
-  /auth
-    /callback        Route handler: exchanges Supabase PKCE code for a session,
-                     handles both password reset (type=recovery) and invite (type=invite)
-  /api               Route handlers (reserved for future use)
-
-/components
-  /ui                Primitives (Button, Input, Label, Avatar, Card, Dialog, Sheet,
-                     Badge, Select, Textarea, Table, Tabs, Separator, Toast)
-  /app               Composed app components:
-    /clients           ClientListPage, AddClientDialog, EditClientDialog,
-                       DeleteClientDialog, ClientDetailPage
-    /devices           DevicesTab, DeviceForm, AddDeviceDialog, EditDeviceDialog,
-                       DeleteDeviceDialog, TagBadge, CSVImportDialog
-                     AppShell      — top nav + desktop sidebar + mobile Sheet drawer
-                     Sidebar       — nav links (SidebarNav)
-                     LoginForm     — sign-in with "Forgot password?" link
-                     SignupForm     — new org registration
-                     SignOutButton — logout
-                     ForgotPasswordForm — reset request (browser Supabase client for PKCE)
-                     ResetPasswordForm  — set new password
-                     AcceptInviteForm   — complete invite (name + password)
-                     InviteModal        — owner-only invite dialog
-
-/lib
-  /supabase          browser.ts · server.ts · admin.ts
-  /db                prisma.ts (singleton with hot-reload guard)
-  /auth              index.ts (getAuthUser, getDbUser, requireAuth, requireOwner)
-  audit.ts           logAudit() — append-only audit log writer
-  env.ts             Single typed, Zod-validated env entry point
-  utils.ts           cn() Tailwind class merger
-
-/prisma
-  schema.prisma
-  /migrations
-    /manual          Hand-written SQL (RLS policies, JWT hook, DDL)
-
-/types               Shared TypeScript types
-/docs                Test plans and technical reference
-```
-
----
-
-## Billing & subscriptions (Week 6)
-
-ClientPulse uses Stripe for subscription management. Three plans are available:
-
-| Plan | Clients | Devices | CSV Import | Scheduled Reports |
-|---|---|---|---|---|
-| Starter (free) | 10 | 50 | — | — |
-| Growth | 50 | 500 | Yes | Yes |
-| Enterprise | Unlimited | Unlimited | Yes | Yes |
-
-### How it works
-
-- **`lib/plans.ts`** — `PLAN_LIMITS`, `canAddClient`, `canAddDevice`, `canUseFeature` are the single source of truth for all plan enforcement
-- **`/billing`** — shows current plan, usage bars, plan cards with Subscribe / Current Plan buttons, and a Manage Billing button (when a Stripe customer exists)
-- **`/api/billing/checkout`** — creates or retrieves the Stripe customer, then starts a hosted Checkout session in `subscription` mode
-- **`/api/billing/portal`** — creates a Billing Portal session so customers can update payment methods or cancel
-- **`/api/webhooks/stripe`** — handles `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`; verifies the Stripe signature before processing
-- **Feature gating** — `createClient` and `createDevice` server actions check plan limits before inserting; `bulkCreateDevices` blocks CSV import on Starter and caps imports at the remaining device capacity with a warning; the monthly-reports cron skips orgs without `scheduled_reports`
-- **UI gating** — the dashboard shows an approaching-limit banner within 2 clients or 10 devices of the plan ceiling; the CSV Import button is disabled with a tooltip on Starter; the Add Client button is disabled at the limit
-
-### Local Stripe testing
-
-```bash
-# Install the Stripe CLI, then forward webhooks to your local server
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-```
-
-Copy the webhook signing secret printed by the CLI into `STRIPE_WEBHOOK_SECRET` in `.env.local`.
-
----
-
-## Auth & tenancy architecture
-
-### JWT org_id claim
-
-Every Supabase JWT carries a custom `org_id` claim injected by `public.custom_access_token_hook` (a Postgres function configured as a Supabase Auth Hook). RLS policies compare this claim against the `organization_id` column on every row — no application-level tenant filtering needed.
-
-### Invite flow
-
-1. Owner calls `inviteUserAction` (server action, protected by `requireOwner()`)
-2. The action calls `admin.auth.admin.inviteUserByEmail(email, { data: { org_id } })` — stores the org ID in `raw_user_meta_data` on the invited auth user
-3. Supabase sends the invite email; invited user clicks link → `/auth/callback` exchanges the PKCE code for a session
-4. User lands on `/accept-invite`: sets display name + password; the server action creates their `public.users` row via Prisma (bypasses RLS), then calls `supabase.auth.refreshSession()` to mint a new JWT with `org_id` embedded
-5. User is redirected to `/dashboard` with a fully valid session
-
-### Password reset
-
-Uses Supabase's PKCE flow. `resetPasswordForEmail` is called from the **browser** Supabase client (not a Server Action) so the PKCE code verifier stays in the browser's cookie jar for the subsequent callback exchange.
-
-### Role system
-
-Three roles: `OWNER`, `TECHNICIAN`, `READONLY` (stored on `public.users.role`).
-
-- `requireAuth()` — verifies session and returns `dbUser`; used by all protected pages
-- `requireOwner()` — extends `requireAuth()`, throws `403 Response` if role is not `OWNER`
-- UI visibility: the "Invite Technician" button is only rendered when `dbUser.role === 'OWNER'`
-- Mutation gates: "Add Device" / "Import CSV" buttons are hidden for `READONLY`; "Delete Client" is hidden for non-`OWNER`. Server actions perform the same role check independently of the UI state.
-
----
-
-## Client & Device CRUD (Week 3)
-
-### Data model additions
-
-The `Client` table gained five new columns in Week 3:
-
-| Column | Type | Notes |
-|---|---|---|
-| `industry` | `text` (nullable) | Free-form industry label |
-| `primary_contact` | `text` (nullable) | Display name of the main contact |
-| `primary_contact_email` | `text` (nullable) | Contact email address |
-| `sla_tier` | `sla_tier` enum | `BASIC` / `STANDARD` / `PREMIUM`, defaults to `BASIC` |
-| `notes` | `text` (nullable) | Free-form notes |
-
-### Audit log actions
-
-Every mutation writes an immutable row to `audit_logs`:
-
-| Action | Trigger | Metadata |
-|---|---|---|
-| `client_created` | Add Client form submitted | `{ client_name }` |
-| `client_updated` | Edit Client form saved | `{ client_name, changed_fields[] }` |
-| `client_deleted` | Delete confirmed (OWNER only) | `{ client_name }` |
-| `device_added` | Add Device form submitted | `{ hostname, client_id }` |
-| `device_updated` | Edit Device form saved | `{ hostname, changed_fields[] }` |
-| `device_deleted` | Delete device confirmed | `{ hostname, client_id }` |
-| `devices_csv_imported` | CSV import confirmed | `{ count, client_id }` |
-
-### CSV import format
-
-The "Import CSV" button on the Devices tab accepts files with these columns:
-
-```
-hostname,type,os,os_version,last_seen,patch_age_days,tags
-web-01,Server,Ubuntu,22.04,2025-05-15,5,"Server,Network"
-```
-
-- `hostname` and `type` are required; rows missing either are highlighted red and skipped
-- `type` must be one of: `Server`, `Workstation`, `Laptop`, `Network`, `Other`
-- `tags` is a comma-separated list inside a quoted cell
-- All other columns are optional
-- Valid rows are bulk-inserted atomically via a single `createMany` call
-
-### Tag colour mapping
-
-| Tag | Colour |
-|---|---|
-| Server | Blue |
-| Workstation | Purple |
-| Laptop | Indigo |
-| Network | Green |
-| Firewall | Orange |
-| NAS | Yellow |
-| (free-form) | Gray |
-
----
-
-## Available scripts
+### Useful scripts
 
 | Script | Description |
 |---|---|
@@ -347,24 +162,45 @@ web-01,Server,Ubuntu,22.04,2025-05-15,5,"Server,Network"
 | `pnpm type-check` | TypeScript check (no emit) |
 | `pnpm lint` | ESLint |
 | `pnpm format` | Prettier write |
-| `pnpm format:check` | Prettier check (CI) |
 | `pnpm db:push` | Push Prisma schema to database |
-| `pnpm db:generate` | Regenerate Prisma Client after schema changes |
-| `pnpm db:studio` | Open Prisma Studio (local DB browser) |
+| `pnpm db:generate` | Regenerate Prisma Client |
+| `pnpm db:studio` | Open Prisma Studio |
+| `pnpm analyze` | Run bundle analyzer (opens browser report) |
+
+---
+
+## Environment Variables
+
+| Variable | Description | Where to find it |
+|---|---|---|
+| `DATABASE_URL` | Supabase Postgres — transaction pooler (port 6543). Used by Prisma at runtime. | Supabase Dashboard → Project Settings → Database → Connection string → **Transaction** |
+| `DIRECT_URL` | Supabase Postgres — direct connection (port 5432). Used by Prisma for migrations only. | Supabase Dashboard → Project Settings → Database → Connection string → **Direct** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase admin key — bypasses RLS. Used server-side to create/delete Auth users. Never expose to the browser. | Supabase Dashboard → Project Settings → API → **service_role** key |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL — safe for browser. | Supabase Dashboard → Project Settings → API → Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key — safe for browser; RLS enforces tenant isolation. | Supabase Dashboard → Project Settings → API → **anon / public** key |
+| `NEXT_PUBLIC_SITE_URL` | Full app origin (no trailing slash). Used in auth email links. Dev: `http://localhost:3000` | Set manually |
+| `STRIPE_SECRET_KEY` | Stripe secret key for Checkout, Portal, and webhook verification. | Stripe Dashboard → Developers → API keys → **Secret key** |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret — validates that webhook payloads come from Stripe. | Stripe Dashboard → Webhooks → endpoint → **Signing secret** |
+| `RESEND_API_KEY` | Resend API key for transactional email (reports and alerts). | [Resend Dashboard](https://resend.com) → API Keys |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint. Used for rate limiting. App fails open if missing. | [Upstash Console](https://console.upstash.com) → Database → REST API |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token. | [Upstash Console](https://console.upstash.com) → Database → REST API |
+| `CRON_SECRET` | Shared secret for the Vercel Cron route. Vercel injects this as `Authorization: Bearer`. | Generate a random 32-char string; set in Vercel project settings |
 
 ---
 
 ## Roadmap
 
-| Week | Theme | Status |
+| Feature | Description | Estimated effort |
 |---|---|---|
-| 1 | Foundation — schema, RLS, auth (signup / login / logout), dashboard placeholder | Done |
-| 2 | Auth & Tenancy — password reset, invite flow, role system, dashboard layout | Done |
-| 3 | Clients & Devices CRUD — client list/detail, device table, CSV import, tag system, audit log | Done |
-| 4 | Health scoring — patch-age scoring, Recharts dashboard (activity, device health, SLA charts) | Done |
-| 5 | Reports & Alerts — PDF monthly reports, scheduled email via Resend, threshold alert emails | Done |
-| 6 | Billing & Subscriptions — Stripe plans (Starter/Growth/Enterprise), feature gating, usage UI | Done |
-| 7 | Ticket integration — ConnectWise / Autotask read-only feed foundation | In progress |
-| 8 | Backup status aggregation | Planned |
-| 9 | SLA metrics and threshold alerting | Planned |
-| 10 | Role management UI + audit log viewer | Planned |
+| **ConnectWise / Autotask integration** | Read-only ticket feed from MSP PSA platforms. Surface open ticket count per client on the detail page. | 2–3 weeks (OAuth + webhook listener per platform) |
+| **AI-generated report summaries** | Use the Anthropic API to generate a plain-English health summary per client, included in the monthly PDF. | 3–4 days (prompt engineering + PDF layout update) |
+| **Mobile app** | React Native (Expo) companion app — push notifications for CRITICAL alerts, client health cards, quick device lookup. | 4–6 weeks |
+| **White-labeling** | Allow MSPs to customise the dashboard logo, colours, and email sender name. Adds a branding table to the schema. | 1–2 weeks (theming system + email template update) |
+| **Backup status aggregation** | Poll Veeam, Acronis, or Datto APIs to surface backup job status alongside device health. | 2–4 weeks per integration |
+| **Role management UI** | Owners can promote/demote users and revoke access from the Settings page. Currently roles are set at invite time and require direct DB access to change. | 3–5 days |
+
+---
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
