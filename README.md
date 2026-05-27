@@ -76,6 +76,22 @@ Open `.env.local` and fill in all values:
 | `STRIPE_PRICE_GROWTH` | Stripe Dashboard → Products → your Growth product → Price ID |
 | `STRIPE_PRICE_ENTERPRISE` | Stripe Dashboard → Products → your Enterprise product → Price ID |
 
+**PSA ticket sync (Week 7)**
+
+| Variable | Where to find it |
+|---|---|
+| `PSA_SYNC_ORGANIZATION_ID` | ClientPulse organization ID; required when more than one org exists |
+| `TICKET_SYNC_LOOKBACK_DAYS` | Number of days fetched per sync run; defaults to `30` |
+| `CONNECTWISE_BASE_URL` | ConnectWise Manage API host, e.g. `https://api-na.myconnectwise.net` |
+| `CONNECTWISE_COMPANY_ID` | ConnectWise company identifier |
+| `CONNECTWISE_PUBLIC_KEY` | ConnectWise API member public key |
+| `CONNECTWISE_PRIVATE_KEY` | ConnectWise API member private key |
+| `CONNECTWISE_CLIENT_ID` | ConnectWise developer client ID |
+| `AUTOTASK_BASE_URL` | Autotask REST API base URL |
+| `AUTOTASK_USERNAME` | Autotask API username |
+| `AUTOTASK_SECRET` | Autotask API secret |
+| `AUTOTASK_INTEGRATION_CODE` | Autotask API integration code |
+
 ### 4. Push the Prisma schema
 
 This creates all five tables (`organizations`, `users`, `clients`, `devices`, `audit_logs`) and the `SlaTier` enum in your Supabase project:
@@ -98,6 +114,8 @@ The Prisma schema creates tables but does not enable Row-Level Security, and doe
    - `prisma/migrations/manual/002_rls_organizations_users.sql`
    - `prisma/migrations/manual/003_alert_logs.sql`
    - `prisma/migrations/manual/004_stripe_billing.sql`
+   - `prisma/migrations/manual/005_week7_schema.sql`
+   - `prisma/migrations/manual/006_tickets_readonly_feed.sql`
 3. Run the verification queries at the bottom of each file to confirm everything is in place
 
 ### 6. Activate the Custom Access Token Hook
@@ -346,7 +364,7 @@ web-01,Server,Ubuntu,22.04,2025-05-15,5,"Server,Network"
 | 4 | Health scoring — patch-age scoring, Recharts dashboard (activity, device health, SLA charts) | Done |
 | 5 | Reports & Alerts — PDF monthly reports, scheduled email via Resend, threshold alert emails | Done |
 | 6 | Billing & Subscriptions — Stripe plans (Starter/Growth/Enterprise), feature gating, usage UI | Done |
-| 7 | Ticket integration — ConnectWise / Autotask read-only feed | Planned |
+| 7 | Ticket integration — ConnectWise / Autotask read-only feed foundation | In progress |
 | 8 | Backup status aggregation | Planned |
 | 9 | SLA metrics and threshold alerting | Planned |
 | 10 | Role management UI + audit log viewer | Planned |

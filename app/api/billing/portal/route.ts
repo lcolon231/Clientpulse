@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { requireAuth } from "@/lib/auth";
 import { getStripe } from "@/lib/stripe";
@@ -6,7 +6,7 @@ import { clientEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 
-export async function POST(_request: NextRequest) {
+export async function POST() {
   const { dbUser } = await requireAuth();
 
   const customerId = dbUser.organization.stripeCustomerId;

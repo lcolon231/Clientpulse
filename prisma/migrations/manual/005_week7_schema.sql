@@ -30,6 +30,17 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 CREATE INDEX IF NOT EXISTS notifications_org_idx ON public.notifications(organization_id);
 
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "notifications: org members can read their own notifications"
+  ON public.notifications;
+
+CREATE POLICY "notifications: org members can read their own notifications"
+  ON public.notifications
+  FOR SELECT
+  TO authenticated
+  USING (organization_id = public.requesting_org_id());
+
 -- =============================================================================
 -- VERIFICATION
 -- =============================================================================
@@ -44,3 +55,7 @@ SELECT EXISTS (
   SELECT 1 FROM information_schema.tables
    WHERE table_schema = 'public' AND table_name = 'notifications'
 ) AS notifications_table_exists;
+
+SELECT relrowsecurity
+  FROM pg_class
+ WHERE oid = 'public.notifications'::regclass;

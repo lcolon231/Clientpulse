@@ -1,124 +1,119 @@
 # Health Scoring
 
-ClientPulse computes a 0–100 health score for each client. The score is deterministic and computed from device data only — no fake or placeholder data for missing future inputs.
+ClientPulse computes a 0-100 health score for each client. The current score is deterministic and computed from device data only. Ticket, backup, uptime, and security findings are intentionally absent until real integrations provide those inputs.
 
 ## Formula
 
-```
-score = Σ (component.score × component.weight)   →  rounded to integer
+```txt
+score = sum(component.score * component.weight) -> rounded integer
 ```
 
 All weights must sum to 1.0.
 
-### Components
+## Components
 
 | Component | Weight | Description |
-|-----------|--------|-------------|
-| Patch Freshness | **0.7** | Are devices being patched regularly? |
-| Device Coverage | **0.3** | Are devices checking in (reporting `lastSeen`)? |
+| --- | ---: | --- |
+| Patch Freshness | 0.7 | Are devices being patched regularly? |
+| Device Coverage | 0.3 | Are devices checking in through `lastSeen`? |
 
-#### Patch Freshness (weight 0.7)
+### Patch Freshness
 
 Scored per device, then averaged across all devices for the client.
 
 | `patchAgeDays` | Per-device score | Label |
-|----------------|------------------|-------|
-| ≤ 30 days | 100 | Current |
-| 31–90 days | 50 | Aging (partial credit) |
+| --- | ---: | --- |
+| <= 30 days | 100 | Current |
+| 31-90 days | 50 | Aging |
 | > 90 days or `null` | 0 | Stale / unknown |
 
-#### Device Coverage (weight 0.3)
+### Device Coverage
 
 Scored per device, then averaged.
 
 | `lastSeen` | Per-device score | Label |
-|------------|------------------|-------|
+| --- | ---: | --- |
 | Within last 30 days | 100 | Reporting |
 | Older than 30 days or `null` | 0 | Stale / unknown |
 
-### Zero-device clients
+### Zero-device Clients
 
-A client with no registered devices has no data to score. Rather than defaulting to CRITICAL (which implies a known failure), ClientPulse returns **score = 75, band = FAIR** with a "No devices registered" detail. This communicates an unknown/neutral state without penalising a new or transitioning client.
+A client with no registered devices has no data to score. Rather than defaulting to CRITICAL, ClientPulse returns `score = 75`, `band = FAIR`, with a `No devices registered` detail.
 
 ## Score Bands
 
 | Band | Score range | Meaning |
-|------|------------|---------|
-| HEALTHY | 85–100 | Well-maintained, up to date |
-| FAIR | 70–84 | Minor gaps, monitor closely |
-| AT_RISK | 50–69 | Notable gaps, action advised |
-| CRITICAL | 0–49 | Significant risk, immediate attention |
+| --- | --- | --- |
+| HEALTHY | 85-100 | Well-maintained, up to date |
+| FAIR | 70-84 | Minor gaps, monitor closely |
+| AT_RISK | 50-69 | Notable gaps, action advised |
+| CRITICAL | 0-49 | Significant risk, immediate attention |
 
-## Code Location
+## Code Locations
 
-All scoring logic lives in `lib/health/score.ts`. The function `calculateHealth(inputs)` is pure: no DB calls, no side effects, fully unit-testable. Tests are in `lib/health/score.test.ts`.
+| Area | Location |
+| --- | --- |
+| Pure scoring engine | `lib/health/score.ts` |
+| Scoring tests | `lib/health/score.test.ts` |
+| Server-side org/client health queries | `lib/health/calculate-client-health.ts` |
+| Canonical band labels and colors | `lib/health/bands.ts` |
+| Health badge UI | `components/ui/health-badge.tsx` |
+| Dashboard charts | `components/app/dashboard/*Chart.tsx` |
+| Monthly PDF report | `lib/pdf/monthly-report.tsx` |
 
-The canonical band→color mapping lives in `lib/health/bands.ts` (`BAND_HEX`, `BAND_LABELS`, `BAND_BADGE_CLASSES`, `BAND_SCORE_TEXT_CLASS`). Import from there; never hardcode hex values in components.
+Import band labels and colors from `lib/health/bands.ts`; do not scatter band hex values across UI or report code.
 
-## Charts
+## Current Visualizations
 
-Three recharts visualisations are built on top of server-computed props (no client-side fetching):
+Dashboard charts are client components fed by server-computed props:
 
-| Chart | Component | Where |
-|-------|-----------|-------|
-| Health distribution donut | `HealthDistributionChart` | Dashboard |
-| Patch age bar chart | `PatchAgeChart` | Dashboard + client Reports tab |
-| Score history line chart | `ScoreHistoryChart` | Client Reports tab |
+| Chart | Component | Data source |
+| --- | --- | --- |
+| Tickets - Last 14 Days | `TicketsOverTimeChart` | Synced ticket creation dates grouped by day |
+| Devices by Health | `DevicesByHealthChart` | Device patch-age buckets derived on the server |
+| Clients by SLA Tier | `SlaPerformanceChart` | Client SLA tier counts |
 
-All charts are `"use client"` components wrapped in `ResponsiveContainer`, with accessible `role="img"` + `aria-label` wrappers and empty-state renders when there is no data.
+Client detail reports currently provide a downloadable monthly PDF report at `/api/reports/[clientId]/monthly`.
 
-## Daily Health Snapshots
+## Ticket Data
 
-`HealthSnapshot` stores one score per client per calendar day, enabling score-over-time trends.
+The ticket feed foundation is documented in `docs/ticket-integration.md`. Ticket rows are displayed in the dashboard and client detail pages once synced, but they are not part of the health score yet. The score still uses only device patch freshness and device coverage.
 
-### Schema
+## Planned Snapshot History
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | cuid | Primary key |
-| `clientId` | FK → clients | Cascade delete |
-| `organizationId` | FK → organizations | For RLS + query convenience |
-| `date` | `date` (Postgres) | Calendar date, no time component |
-| `score` | int | 0–100 |
-| `band` | string | CRITICAL \| AT_RISK \| FAIR \| HEALTHY |
-| `patchScore` | int? | Patch Freshness component score |
-| `coverageScore` | int? | Device Coverage component score |
+Score-over-time history is not implemented in the current schema. The next version should add a `HealthSnapshot` model with one row per client per calendar day, plus a Vercel Cron route that computes and upserts snapshots daily.
 
-Unique constraint on `(clientId, date)` — one snapshot per client per day. Re-running the cron on the same day upserts (overwrites), never duplicates.
+Recommended future fields:
 
-### Cron Job
+| Field | Notes |
+| --- | --- |
+| `id` | Primary key |
+| `clientId` | FK to `clients`, cascade delete |
+| `organizationId` | FK to `organizations` for RLS/query convenience |
+| `date` | Calendar date, unique with `clientId` |
+| `score` | 0-100 integer |
+| `band` | CRITICAL / AT_RISK / FAIR / HEALTHY |
+| `patchScore` | Nullable component sub-score |
+| `coverageScore` | Nullable component sub-score |
 
-`app/api/cron/health-snapshot/route.ts` is a Vercel Cron endpoint that:
-
-1. Authenticates via `Authorization: Bearer <CRON_SECRET>` header (set `CRON_SECRET` in Vercel environment variables).
-2. Iterates **every client across every org** using Prisma (which runs as the postgres superuser, bypassing RLS). This is an explicit admin operation — the only intentional cross-org boundary in the codebase.
-3. Computes each client's health via `calculateHealth()` (the same pure engine used everywhere else).
-4. Upserts a `HealthSnapshot` for today. Idempotent: safe to call multiple times per day.
-
-**Schedule** (`vercel.json`): `0 6 * * *` — daily at 06:00 UTC.
-
-> ⚠️ Cron jobs only run on the **deployed Vercel app**, not locally. To test the endpoint locally, send a GET request to `/api/cron/health-snapshot` with `Authorization: Bearer <CRON_SECRET>`.
-
-### RLS
-
-`prisma/migrations/manual/003_rls_health_snapshots.sql` — apply via Supabase SQL Editor after `prisma db push`. Grants SELECT to authenticated users for their own org's snapshots. No INSERT/UPDATE/DELETE policy for the authenticated role (all writes go through the cron's service-role key).
+The cron route should be an explicit service-role admin operation and the only intentional cross-org health read path.
 
 ## Future Inputs
 
-The formula is designed for easy extension. To add a new component:
+The formula is designed for extension. To add a new component:
 
-1. Add a weight constant to `score.ts` (and reduce existing weights so they still sum to 1.0).
-2. Add the required field(s) to the `HealthInputs` interface.
+1. Add a weight constant to `score.ts` and adjust existing weights so they still sum to 1.0.
+2. Add the required field(s) to `HealthInputs`.
 3. Compute the component score and push it to the `components` array.
-4. Add a nullable column to `HealthSnapshot` for the component sub-score.
+4. Add nullable snapshot columns for component sub-scores once score history exists.
 5. Update this document.
 
-**Planned future components:**
+Planned future components:
 
-| Component | Planned weight contribution | Data source |
-|-----------|-----------------------------|-------------|
-| Open ticket backlog | TBD | ConnectWise / Autotask integration |
-| Backup success rate | TBD | Backup tool integration |
-| SLA compliance | TBD | SLA tier vs. actual response metrics |
-
-These components are intentionally absent until real data is available. The current 0.7/0.3 split reflects the only two data points we have today.
+| Component | Data source |
+| --- | --- |
+| Open ticket backlog | ConnectWise / Autotask ticket feed |
+| Backup success rate | Backup tool integration |
+| SLA compliance | SLA tier vs. actual response metrics |
+| Security findings | EDR / vulnerability scanner integration |
+| Uptime issues | Monitoring integration |

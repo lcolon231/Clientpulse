@@ -38,6 +38,18 @@ const serverSchema = z.object({
   STRIPE_PRICE_STARTER: z.string().min(1).optional(),
   STRIPE_PRICE_GROWTH: z.string().min(1).optional(),
   STRIPE_PRICE_ENTERPRISE: z.string().min(1).optional(),
+  // PSA ticket sync. Optional so the app can deploy before integrations exist.
+  PSA_SYNC_ORGANIZATION_ID: z.string().min(1).optional(),
+  TICKET_SYNC_LOOKBACK_DAYS: z.coerce.number().int().positive().max(365).default(30),
+  CONNECTWISE_BASE_URL: z.string().url().optional(),
+  CONNECTWISE_COMPANY_ID: z.string().min(1).optional(),
+  CONNECTWISE_PUBLIC_KEY: z.string().min(1).optional(),
+  CONNECTWISE_PRIVATE_KEY: z.string().min(1).optional(),
+  CONNECTWISE_CLIENT_ID: z.string().min(1).optional(),
+  AUTOTASK_BASE_URL: z.string().url().optional(),
+  AUTOTASK_USERNAME: z.string().min(1).optional(),
+  AUTOTASK_SECRET: z.string().min(1).optional(),
+  AUTOTASK_INTEGRATION_CODE: z.string().min(1).optional(),
 });
 
 const clientSchema = z.object({
@@ -92,6 +104,17 @@ export const serverEnv = parseEnv(
     STRIPE_PRICE_STARTER: process.env.STRIPE_PRICE_STARTER,
     STRIPE_PRICE_GROWTH: process.env.STRIPE_PRICE_GROWTH,
     STRIPE_PRICE_ENTERPRISE: process.env.STRIPE_PRICE_ENTERPRISE,
+    PSA_SYNC_ORGANIZATION_ID: process.env.PSA_SYNC_ORGANIZATION_ID,
+    TICKET_SYNC_LOOKBACK_DAYS: process.env.TICKET_SYNC_LOOKBACK_DAYS,
+    CONNECTWISE_BASE_URL: process.env.CONNECTWISE_BASE_URL,
+    CONNECTWISE_COMPANY_ID: process.env.CONNECTWISE_COMPANY_ID,
+    CONNECTWISE_PUBLIC_KEY: process.env.CONNECTWISE_PUBLIC_KEY,
+    CONNECTWISE_PRIVATE_KEY: process.env.CONNECTWISE_PRIVATE_KEY,
+    CONNECTWISE_CLIENT_ID: process.env.CONNECTWISE_CLIENT_ID,
+    AUTOTASK_BASE_URL: process.env.AUTOTASK_BASE_URL,
+    AUTOTASK_USERNAME: process.env.AUTOTASK_USERNAME,
+    AUTOTASK_SECRET: process.env.AUTOTASK_SECRET,
+    AUTOTASK_INTEGRATION_CODE: process.env.AUTOTASK_INTEGRATION_CODE,
   },
   "server"
 );

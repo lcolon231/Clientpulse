@@ -7,6 +7,7 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import type { HealthResult } from "@/lib/health/score";
+import { BAND_HEX, BAND_LABELS } from "@/lib/health/bands";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,19 +42,8 @@ export interface MonthlyReportData {
 // Colors — mirror the dashboard badge palette
 // ---------------------------------------------------------------------------
 
-const BAND_COLOR: Record<HealthResult["band"], string> = {
-  HEALTHY: "#22c55e",
-  FAIR: "#3b82f6",
-  AT_RISK: "#f59e0b",
-  CRITICAL: "#ef4444",
-};
-
-const BAND_LABEL: Record<HealthResult["band"], string> = {
-  HEALTHY: "Healthy",
-  FAIR: "Fair",
-  AT_RISK: "At Risk",
-  CRITICAL: "Critical",
-};
+const BAND_COLOR = BAND_HEX;
+const BAND_LABEL = BAND_LABELS;
 
 // ---------------------------------------------------------------------------
 // Styles
