@@ -297,6 +297,9 @@ export default function LandingPage() {
             <span>· © {new Date().getFullYear()} NodeLink Technologies</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/case-study" className="hover:text-white transition-colors">
+              Case Study
+            </Link>
             <a href="#" className="hover:text-white transition-colors">
               Privacy Policy
             </a>
