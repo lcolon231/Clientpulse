@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import {
   BarChart,
@@ -8,19 +8,23 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-} from 'recharts'
+} from "recharts";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Props {
-  data: { date: string; count: number }[]
+  data: { date: string; count: number }[];
+  title?: string;
 }
 
-export function TicketsOverTimeChart({ data }: Props) {
+export function TicketsOverTimeChart({
+  data,
+  title = "Tickets - Last 14 Days",
+}: Props) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Activity — Last 14 Days</CardTitle>
+        <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={220}>
@@ -40,10 +44,10 @@ export function TicketsOverTimeChart({ data }: Props) {
               axisLine={false}
             />
             <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
-            <Bar dataKey="count" name="Events" fill="#6366f1" radius={[3, 3, 0, 0]} />
+            <Bar dataKey="count" name="Tickets" fill="#6366f1" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
-  )
+  );
 }
