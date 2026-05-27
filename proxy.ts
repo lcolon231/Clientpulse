@@ -145,15 +145,26 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Run on every path EXCEPT:
-     *   - _next/static  — compiled JS/CSS bundles
-     *   - _next/image   — Next.js image optimisation
-     *   - favicon.ico   — browser icon request
-     *   - common static extensions (svg, png, jpg, etc.)
+     * Only run on routes that need session-awareness:
+     *   1. Protected app routes — /dashboard, /clients, /coming-soon (require auth)
+     *   2. Auth routes — /login, /signup, etc. (redirect to dashboard if already authed)
+     *   3. Auth callback — /auth/callback (token exchange)
      *
-     * The negative lookahead keeps the middleware off of purely static assets
-     * where session checking is both unnecessary and wasteful.
+     * Intentionally NOT matched (so middleware never runs on them):
+     *   - /                  marketing landing page — always public
+     *   - /sitemap.xml       SEO — must be crawlable without auth
+     *   - /robots.txt        SEO — must be crawlable without auth
+     *   - /api/*             route handlers carry their own auth/verification
+     *   - /_next/*           Next.js internals
+     *   - /favicon.ico       static asset
+     *   - any unknown path   falls through to Next.js router → renders not-found.tsx
+     *
+     * This approach (positive match of known routes) is safer than a negative
+     * lookahead: new protected routes must be added here explicitly, which
+     * makes the security boundary visible and auditable.
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/(dashboard|clients|coming-soon)(.*)",
+    "/(login|signup|forgot-password|reset-password|accept-invite)(.*)",
+    "/auth/callback(.*)",
   ],
 };

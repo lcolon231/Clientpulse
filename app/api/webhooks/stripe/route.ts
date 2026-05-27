@@ -2,11 +2,24 @@ import { type NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { prisma } from "@/lib/db/prisma";
+import { logger } from "@/lib/logger";
+import { rateLimit } from "@/lib/ratelimit";
 import { getStripe, priceIdToPlan } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    request.headers.get("x-real-ip") ??
+    "anonymous";
+
+  const rl = await rateLimit(`stripe-webhook:${ip}`);
+  if (!rl.success) {
+    logger.warn({ ip }, "Stripe webhook rate-limited");
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     return NextResponse.json(
@@ -30,6 +43,8 @@ export async function POST(request: NextRequest) {
   }
 
   const stripe = getStripe();
+
+  logger.info({ eventType: event.type }, "Stripe webhook received");
 
   switch (event.type) {
     case "checkout.session.completed": {

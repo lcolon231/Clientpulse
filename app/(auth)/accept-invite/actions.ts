@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
 import { getAuthUser } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { rateLimitByIp } from "@/lib/ratelimit";
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -72,6 +73,12 @@ export async function acceptInviteAction(rawData: {
   name: string;
   password: string;
 }): Promise<AcceptInviteResult> {
+  // 0. Rate limit — 10 invite-acceptance attempts per 10 seconds per IP.
+  const rl = await rateLimitByIp();
+  if (!rl.success) {
+    return { success: false, error: "Too many requests. Please try again later." };
+  }
+
   // 1. Confirm the caller has a valid session (set by /auth/callback).
   const authUser = await getAuthUser();
 
