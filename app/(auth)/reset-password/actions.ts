@@ -4,6 +4,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -59,7 +60,7 @@ export async function resetPasswordAction(rawData: {
   });
 
   if (error) {
-    console.error("[resetPasswordAction] updateUser error", error);
+    logger.error({ error }, "[resetPasswordAction] updateUser error");
     return {
       success: false,
       error:

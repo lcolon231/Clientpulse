@@ -6,6 +6,8 @@ import { requireOwner } from "@/lib/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { clientEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
+import { rateLimitByIp } from "@/lib/ratelimit";
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -55,6 +57,12 @@ export type InviteResult =
 export async function inviteUserAction(rawData: {
   email: string;
 }): Promise<InviteResult> {
+  // 0. Rate limit — 10 invite attempts per 10 seconds per IP.
+  const rl = await rateLimitByIp();
+  if (!rl.success) {
+    return { success: false, error: "Too many requests. Please try again later." };
+  }
+
   // 1. Auth + role check — throws 403 if not OWNER.
   const { dbUser } = await requireOwner();
 
@@ -81,7 +89,7 @@ export async function inviteUserAction(rawData: {
   });
 
   if (error) {
-    console.error("[inviteUserAction] inviteUserByEmail error", error);
+    logger.error({ error }, "[inviteUserAction] inviteUserByEmail error");
 
     if (error.message.toLowerCase().includes("already")) {
       return {

@@ -8,6 +8,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { prisma } from "@/lib/db/prisma";
 import { logAudit } from "@/lib/audit";
 import { getAuthUser } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -85,9 +86,7 @@ export async function acceptInviteAction(rawData: {
   const orgId = authUser.user_metadata?.org_id as string | undefined;
 
   if (!orgId) {
-    console.error("[acceptInviteAction] No org_id in user_metadata", {
-      userId: authUser.id,
-    });
+    logger.error({ userId: authUser.id }, "[acceptInviteAction] No org_id in user_metadata");
     return {
       success: false,
       error: "Invite is missing organization data. Please request a new invite.",
@@ -121,7 +120,7 @@ export async function acceptInviteAction(rawData: {
     });
     dbUserId = dbUser.id;
   } catch (err) {
-    console.error("[acceptInviteAction] Failed to create user row", err);
+    logger.error({ err }, "[acceptInviteAction] Failed to create user row");
     return {
       success: false,
       error: "Account setup failed. You may have already accepted this invite — try signing in.",
@@ -144,7 +143,7 @@ export async function acceptInviteAction(rawData: {
   const { error: passwordError } = await supabase.auth.updateUser({ password });
 
   if (passwordError) {
-    console.error("[acceptInviteAction] updateUser (password) error", passwordError);
+    logger.error({ passwordError }, "[acceptInviteAction] updateUser (password) error");
     // The public.users row was created — the user can still sign in via a new
     // invite if they contact the owner. Log and surface a message.
     return {
@@ -160,7 +159,7 @@ export async function acceptInviteAction(rawData: {
   if (refreshError) {
     // Non-fatal: the user is still authenticated. They may see empty data until
     // their token naturally refreshes. Log but proceed.
-    console.error("[acceptInviteAction] refreshSession error", refreshError);
+    logger.error({ refreshError }, "[acceptInviteAction] refreshSession error");
   }
 
   // 8. Audit log — record the acceptance.

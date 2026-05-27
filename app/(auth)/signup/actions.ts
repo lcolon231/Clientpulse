@@ -5,6 +5,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
+import { rateLimitByIp } from "@/lib/ratelimit";
 
 // ---------------------------------------------------------------------------
 // Schema — server-side validation (never trust the client)
@@ -59,6 +61,12 @@ export async function signUpAction(rawData: {
   password: string;
   orgName: string;
 }): Promise<SignUpResult> {
+  // 0. Rate limit by IP — 10 sign-up attempts per 10 seconds.
+  const rl = await rateLimitByIp();
+  if (!rl.success) {
+    return { success: false, error: "Too many requests. Please try again later." };
+  }
+
   // 1. Validate input server-side — the client schema is a UX aid, not a gate.
   const parsed = signUpSchema.safeParse(rawData);
   if (!parsed.success) {
@@ -108,15 +116,13 @@ export async function signUpAction(rawData: {
     // Transaction rolled back — clean up the Auth user so the email can be
     // reused and no ghost account exists in auth.users.
     await admin.auth.admin.deleteUser(authUserId).catch((cleanupErr) => {
-      // Cleanup failure is non-fatal for the caller but needs observability.
-      // TODO (Week N): replace with structured logger when one is wired up.
-      console.error(
-        "[signUpAction] Auth user cleanup failed after TX rollback",
+      logger.error(
         { authUserId, cleanupErr },
+        "[signUpAction] Auth user cleanup failed after TX rollback",
       );
     });
 
-    console.error("[signUpAction] DB transaction failed", txError);
+    logger.error({ txError }, "[signUpAction] DB transaction failed");
     return {
       success: false,
       error: "Account setup failed. Please try again.",
@@ -137,7 +143,7 @@ export async function signUpAction(rawData: {
     // The account was created successfully but auto-sign-in failed.
     // This is an edge case (e.g. Supabase transient error). The user can
     // sign in manually at /login — their account and org row exist.
-    console.error("[signUpAction] Auto sign-in failed after signup", signInError);
+    logger.error({ signInError }, "[signUpAction] Auto sign-in failed after signup");
   }
 
   return { success: true };

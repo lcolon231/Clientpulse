@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,11 +53,6 @@ export async function logAudit(params: LogAuditParams): Promise<void> {
     });
   } catch (err) {
     // Non-fatal — log and move on.
-    console.error("[logAudit] Failed to write audit row", {
-      action,
-      entityType,
-      entityId,
-      err,
-    });
+    logger.error({ action, entityType, entityId, err }, "[logAudit] Failed to write audit row");
   }
 }
