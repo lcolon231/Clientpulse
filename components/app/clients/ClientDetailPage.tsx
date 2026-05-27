@@ -8,6 +8,7 @@ import { ChevronRightIcon, DownloadIcon, PencilIcon, Trash2Icon } from "lucide-r
 import type { Client, Device, Role } from "@prisma/client";
 import type { HealthResult } from "@/lib/health/score";
 import { DevicesTab } from "@/components/app/devices/DevicesTab";
+import { TicketsTab, type TicketWithDetails } from "@/components/app/tickets/TicketsTab";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,8 @@ import { SLA_TIER_LABELS } from "@/types";
 // Types & helpers
 // ---------------------------------------------------------------------------
 
+type OrgMember = { id: string; name: string | null; email: string };
+
 interface ClientDetailPageProps {
   client: Client;
   devices: Device[];
@@ -29,6 +32,8 @@ interface ClientDetailPageProps {
   activeTab: string;
   health: HealthResult;
   canUseCsvImport: boolean;
+  tickets: TicketWithDetails[];
+  orgMembers: OrgMember[];
 }
 
 const SLA_VARIANTS: Record<
@@ -83,6 +88,8 @@ export function ClientDetailPage({
   activeTab,
   health,
   canUseCsvImport,
+  tickets,
+  orgMembers,
 }: ClientDetailPageProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
@@ -237,13 +244,14 @@ export function ClientDetailPage({
           />
         </TabsContent>
 
-        {/* Tickets — placeholder */}
+        {/* Tickets */}
         <TabsContent value="tickets">
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Ticket integration coming soon.
-            </CardContent>
-          </Card>
+          <TicketsTab
+            tickets={tickets}
+            clientId={client.id}
+            orgMembers={orgMembers}
+            role={role}
+          />
         </TabsContent>
 
         {/* Reports */}

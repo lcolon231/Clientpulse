@@ -12,8 +12,9 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const client = await prisma.client.findUnique({
-    where: { id },
+  const { dbUser } = await requireAuth();
+  const client = await prisma.client.findFirst({
+    where: { id, organizationId: dbUser.organizationId },
     select: { name: true },
   });
   return { title: client ? `${client.name} — ClientPulse` : "Client — ClientPulse" };
@@ -29,12 +30,31 @@ export default async function ClientPage({
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { dbUser } = await requireAuth();
 
-  const [client, health] = await Promise.all([
+  const [client, health, tickets, orgMembers] = await Promise.all([
     prisma.client.findFirst({
       where: { id, organizationId: dbUser.organizationId },
       include: { devices: { orderBy: { createdAt: "desc" } } },
     }),
     getClientHealth(id, dbUser.organizationId),
+    prisma.ticket.findMany({
+      where: { clientId: id, organizationId: dbUser.organizationId },
+      include: {
+        comments: {
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        assigneeUser: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.user.findMany({
+      where: { organizationId: dbUser.organizationId },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   if (!client) notFound();
@@ -47,6 +67,8 @@ export default async function ClientPage({
       activeTab={sp.tab ?? "overview"}
       health={health}
       canUseCsvImport={canUseFeature(dbUser.organization, "csv_import")}
+      tickets={tickets}
+      orgMembers={orgMembers}
     />
   );
 }

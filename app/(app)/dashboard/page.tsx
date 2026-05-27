@@ -12,12 +12,14 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InviteModal } from "@/components/app/InviteModal";
 import { HealthBadge } from "@/components/ui/health-badge";
 import { TicketsOverTimeChart } from "@/components/app/dashboard/TicketsOverTimeChart";
 import { DevicesByHealthChart } from "@/components/app/dashboard/DevicesByHealthChart";
 import { SlaPerformanceChart } from "@/components/app/dashboard/SlaPerformanceChart";
+import { OPEN_TICKET_STATUSES } from "@/types/ticket";
 
 export const metadata = {
   title: "Dashboard — ClientPulse",
@@ -30,37 +32,59 @@ const SLA_LABELS: Record<string, string> = {
   ENTERPRISE: "Enterprise",
 };
 
+function getRecentTicketCutoff() {
+  return new Date(Date.now() - 14 * 86_400_000);
+}
+
 export default async function DashboardPage() {
   const { dbUser } = await requireAuth();
   const { organizationId } = dbUser;
   const isOwner = dbUser.role === "OWNER";
+  const recentTicketCutoff = getRecentTicketCutoff();
 
-  const [clients, orgHealthMap, recentLogs, devices, deviceCount] = await Promise.all([
-    prisma.client.findMany({
-      where: { organizationId },
-      select: {
-        id: true,
-        name: true,
-        slaTier: true,
-        _count: { select: { devices: true } },
-      },
-      orderBy: { name: "asc" },
-    }),
-    getOrgHealth(organizationId),
-    prisma.auditLog.findMany({
-      where: {
-        organizationId,
-        createdAt: { gte: new Date(Date.now() - 14 * 86_400_000) },
-      },
-      select: { createdAt: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.device.findMany({
-      where: { client: { organizationId } },
-      select: { patchAgeDays: true },
-    }),
-    prisma.device.count({ where: { client: { organizationId } } }),
-  ]);
+  const [clients, orgHealthMap, recentTickets, devices, deviceCount, openTicketCount, perClientOpenTickets] =
+    await Promise.all([
+      prisma.client.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          name: true,
+          slaTier: true,
+          _count: { select: { devices: true } },
+        },
+        orderBy: { name: "asc" },
+      }),
+      getOrgHealth(organizationId),
+      // Chart: tickets created in the last 14 days (native + PSA), keyed by createdAt
+      prisma.ticket.findMany({
+        where: {
+          organizationId,
+          createdAt: { gte: recentTicketCutoff },
+        },
+        select: { createdAt: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.device.findMany({
+        where: { client: { organizationId } },
+        select: { patchAgeDays: true },
+      }),
+      prisma.device.count({ where: { client: { organizationId } } }),
+      prisma.ticket.count({
+        where: {
+          organizationId,
+          status: { in: OPEN_TICKET_STATUSES },
+        },
+      }),
+      // Per-client open ticket counts for badge display
+      prisma.ticket.findMany({
+        where: {
+          organizationId,
+          clientId: { not: null },
+          status: { in: OPEN_TICKET_STATUSES },
+        },
+        select: { clientId: true },
+      }),
+    ]);
 
   // --- Plan limit banner ---
   const currentPlan = (dbUser.organization.plan ?? "STARTER") as Plan;
@@ -72,11 +96,11 @@ export default async function DashboardPage() {
     limits.devices !== -1 && limits.devices - deviceCount <= 10;
   const showLimitBanner = nearClientLimit || nearDeviceLimit;
 
-  // --- Tickets over time: audit log events grouped by day (last 14 days) ---
-  const auditCountByDay = new Map<string, number>();
-  for (const log of recentLogs) {
-    const key = log.createdAt.toISOString().slice(0, 10);
-    auditCountByDay.set(key, (auditCountByDay.get(key) ?? 0) + 1);
+  // --- Tickets over time: grouped by createdAt date (last 14 days) ---
+  const ticketCountByDay = new Map<string, number>();
+  for (const ticket of recentTickets) {
+    const key = new Date(ticket.createdAt).toISOString().slice(0, 10);
+    ticketCountByDay.set(key, (ticketCountByDay.get(key) ?? 0) + 1);
   }
   const today = new Date();
   const ticketsChartData = Array.from({ length: 14 }, (_, i) => {
@@ -85,11 +109,22 @@ export default async function DashboardPage() {
     const key = d.toISOString().slice(0, 10);
     return {
       date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      count: auditCountByDay.get(key) ?? 0,
+      count: ticketCountByDay.get(key) ?? 0,
     };
   });
 
-  // --- Devices by health: classify by patch age bands matching the scoring engine ---
+  // --- Per-client open ticket map ---
+  const openTicketsByClient = new Map<string, number>();
+  for (const t of perClientOpenTickets) {
+    if (t.clientId) {
+      openTicketsByClient.set(
+        t.clientId,
+        (openTicketsByClient.get(t.clientId) ?? 0) + 1,
+      );
+    }
+  }
+
+  // --- Devices by health ---
   let healthyCount = 0;
   let atRiskCount = 0;
   let criticalCount = 0;
@@ -104,7 +139,7 @@ export default async function DashboardPage() {
     { band: "Critical", count: criticalCount },
   ].filter((d) => d.count > 0);
 
-  // --- SLA distribution: count clients per tier (derived from the already-fetched clients) ---
+  // --- SLA distribution ---
   const slaCounts = new Map<string, number>();
   for (const c of clients) {
     slaCounts.set(c.slaTier, (slaCounts.get(c.slaTier) ?? 0) + 1);
@@ -144,7 +179,6 @@ export default async function DashboardPage() {
       )}
 
       {!hasClients ? (
-        /* Empty state — no clients yet */
         <Card>
           <CardHeader>
             <CardTitle>No clients yet</CardTitle>
@@ -174,12 +208,13 @@ export default async function DashboardPage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {clients.map((client) => {
                 const health = orgHealthMap.get(client.id);
+                const openTickets = openTicketsByClient.get(client.id) ?? 0;
                 return (
                   <Link key={client.id} href={`/clients/${client.id}`}>
                     <Card className="cursor-pointer transition-colors hover:bg-muted/40">
                       <CardContent className="pb-4 pt-4">
                         <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">
                               {client.name}
                             </p>
@@ -190,7 +225,18 @@ export default async function DashboardPage() {
                                 : "devices"}
                             </p>
                           </div>
-                          {health && <HealthBadge health={health} />}
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {health && <HealthBadge health={health} />}
+                            {openTickets > 0 && (
+                              <Badge
+                                variant={openTickets >= 6 ? "red" : "orange"}
+                                className="text-[10px] py-0"
+                              >
+                                {openTickets} open{" "}
+                                {openTickets === 1 ? "ticket" : "tickets"}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -200,15 +246,17 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          {/* Charts row 1: activity + devices by health */}
+          {/* Charts */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <TicketsOverTimeChart data={ticketsChartData} />
+              <TicketsOverTimeChart
+                data={ticketsChartData}
+                title={`Tickets - Last 14 Days (${openTicketCount} open)`}
+              />
             </div>
             <DevicesByHealthChart data={deviceHealthData} />
           </div>
 
-          {/* Charts row 2: SLA distribution */}
           <SlaPerformanceChart data={slaChartData} />
         </>
       )}

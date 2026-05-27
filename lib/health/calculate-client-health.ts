@@ -5,72 +5,90 @@ import { cache } from "react";
 import { prisma } from "@/lib/db/prisma";
 import { calculateHealth, type HealthResult } from "@/lib/health/score";
 
-// Select only the two fields the scoring engine needs — no over-fetching.
 const DEVICE_HEALTH_SELECT = {
   patchAgeDays: true,
   lastSeen: true,
 } as const;
 
+import type { TicketStatus } from "@prisma/client";
+
+const OPEN_STATUSES: TicketStatus[] = ["NEW", "OPEN", "IN_PROGRESS", "WAITING"];
+
 type DeviceHealthRow = { patchAgeDays: number; lastSeen: Date };
 
-function toHealthResult(devices: DeviceHealthRow[]): HealthResult {
+function toHealthResult(devices: DeviceHealthRow[], openTicketCount = 0): HealthResult {
   return calculateHealth({
     deviceCount: devices.length,
     devices: devices.map((d) => ({
       patchAgeDays: d.patchAgeDays,
       lastSeen: d.lastSeen,
     })),
+    openTicketCount,
   });
 }
 
 /**
  * Compute the health score for a single client.
- *
- * The double-scoped where clause (clientId + client.organizationId) means a
- * caller cannot score a client from another org even if they supply a valid
- * clientId — the org check is enforced in the DB query, not just at the call
- * site.
- *
- * Memoised with React cache() so repeated calls within the same render tree
- * (e.g. layout + page both needing the same score) hit the DB only once.
+ * Double-scoped where clause prevents cross-org access even with a valid clientId.
  */
 export const getClientHealth = cache(
   async (clientId: string, organizationId: string): Promise<HealthResult> => {
-    const devices = await prisma.device.findMany({
-      where: {
-        clientId,
-        client: { organizationId },
-      },
-      select: DEVICE_HEALTH_SELECT,
-    });
+    const [devices, openTicketCount] = await Promise.all([
+      prisma.device.findMany({
+        where: {
+          clientId,
+          client: { organizationId },
+        },
+        select: DEVICE_HEALTH_SELECT,
+      }),
+      prisma.ticket.count({
+        where: {
+          clientId,
+          organizationId,
+          status: { in: OPEN_STATUSES },
+        },
+      }),
+    ]);
 
-    return toHealthResult(devices);
+    return toHealthResult(devices, openTicketCount);
   },
 );
 
 /**
- * Compute health scores for every client in the org in a single DB round-trip.
- *
- * Loads all clients with their devices in one query (avoids N+1), then scores
- * entirely in memory. Returns a Map<clientId, HealthResult> so callers can
- * look up any client's score in O(1).
- *
- * Memoised with React cache() — safe to call from both layout and page without
- * doubling the query.
+ * Compute health scores for every client in the org in two DB round-trips.
+ * Returns a Map<clientId, HealthResult>.
  */
 export const getOrgHealth = cache(
   async (organizationId: string): Promise<Map<string, HealthResult>> => {
-    const clients = await prisma.client.findMany({
-      where: { organizationId },
-      select: {
-        id: true,
-        devices: { select: DEVICE_HEALTH_SELECT },
-      },
-    });
+    const [clients, openTickets] = await Promise.all([
+      prisma.client.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          devices: { select: DEVICE_HEALTH_SELECT },
+        },
+      }),
+      prisma.ticket.findMany({
+        where: {
+          organizationId,
+          clientId: { not: null },
+          status: { in: OPEN_STATUSES },
+        },
+        select: { clientId: true },
+      }),
+    ]);
+
+    const openCountByClient = new Map<string, number>();
+    for (const t of openTickets) {
+      if (t.clientId) {
+        openCountByClient.set(t.clientId, (openCountByClient.get(t.clientId) ?? 0) + 1);
+      }
+    }
 
     const scores = new Map<string, HealthResult>();
     for (const client of clients) {
-      scores.set(client.id, toHealthResult(client.devices));
+      const openTicketCount = openCountByClient.get(client.id) ?? 0;
+      scores.set(client.id, toHealthResult(client.devices, openTicketCount));
     }
     return scores;
   },

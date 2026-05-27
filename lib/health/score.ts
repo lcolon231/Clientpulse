@@ -1,27 +1,24 @@
 /**
  * Health scoring engine — pure, deterministic, no side effects.
  *
- * Two weighted components today (weights must sum to 1.0):
+ * Three weighted components (weights must sum to 1.0):
  *
- *   Patch Freshness  (weight 0.7)
+ *   Patch Freshness  (weight 0.5)
  *     per-device: ≤30 days → 100 | 31–90 days → 50 | >90 days or null → 0
  *     component score = mean of per-device scores
  *
- *   Device Coverage  (weight 0.3)
+ *   Device Coverage  (weight 0.2)
  *     per-device: lastSeen within 30 days → 100 | stale/null → 0
  *     component score = (recently-seen count / total) × 100
  *
- *   Total = Σ(component.score × component.weight), rounded to integer.
- *
- * Adding a future component (e.g. backup success, open ticket count):
- *   1. Add a weight constant and reduce existing weights so they sum to 1.0.
- *   2. Add its field(s) to HealthInputs.
- *   3. Compute its component score and push it to the components array.
+ *   Open Tickets     (weight 0.3)
+ *     0 open → 100 | 1–2 → 75 | 3–5 → 50 | 6–10 → 25 | 11+ → 0
  */
 
 // --- Weights (must sum to 1.0) ---
-const PATCH_WEIGHT = 0.7
-const COVERAGE_WEIGHT = 0.3
+const PATCH_WEIGHT = 0.5
+const COVERAGE_WEIGHT = 0.2
+const TICKET_WEIGHT = 0.3
 
 // --- Band thresholds ---
 const HEALTHY_MIN = 85
@@ -29,13 +26,14 @@ const FAIR_MIN = 70
 const AT_RISK_MIN = 50
 
 // --- Sub-scoring thresholds ---
-const PATCH_CURRENT_DAYS = 30 // ≤ this: fully current
-const PATCH_AGING_DAYS = 90 // ≤ this (and > CURRENT): aging, partial credit
-const SEEN_RECENT_DAYS = 30 // lastSeen within this many days: device is reporting
+const PATCH_CURRENT_DAYS = 30
+const PATCH_AGING_DAYS = 90
+const SEEN_RECENT_DAYS = 30
 
 export interface HealthInputs {
   deviceCount: number
   devices: { patchAgeDays: number | null; lastSeen: Date | null }[]
+  openTicketCount?: number
 }
 
 export interface HealthComponent {
@@ -70,20 +68,39 @@ function isRecentlySeen(lastSeen: Date | null): boolean {
   return (Date.now() - lastSeen.getTime()) / msPerDay <= SEEN_RECENT_DAYS
 }
 
+function openTicketScore(openCount: number): number {
+  if (openCount === 0) return 100
+  if (openCount <= 2) return 75
+  if (openCount <= 5) return 50
+  if (openCount <= 10) return 25
+  return 0
+}
+
 export function calculateHealth(inputs: HealthInputs): HealthResult {
   const { devices } = inputs
+  const openTicketCount = inputs.openTicketCount ?? 0
+  const tScore = openTicketScore(openTicketCount)
 
-  // Zero-device state: no data to score — represent as neutral FAIR (75).
-  // A client with no devices is neither healthy nor actively failing; returning
-  // FAIR communicates "unknown" without penalising a new or transitioning client.
+  const ticketComponent: HealthComponent = {
+    name: 'Open Tickets',
+    score: tScore,
+    weight: TICKET_WEIGHT,
+    detail: openTicketCount === 0
+      ? 'No open tickets'
+      : `${openTicketCount} open ticket${openTicketCount === 1 ? '' : 's'}`,
+  }
+
+  // Zero-device state: patch and coverage are unknown; score tickets normally.
   if (devices.length === 0) {
     const noDataDetail = 'No devices registered'
+    const rawScore = 75 * PATCH_WEIGHT + 75 * COVERAGE_WEIGHT + tScore * TICKET_WEIGHT
     return {
-      score: 75,
-      band: 'FAIR',
+      score: Math.round(rawScore),
+      band: toBand(Math.round(rawScore)),
       components: [
         { name: 'Patch Freshness', score: 75, weight: PATCH_WEIGHT, detail: noDataDetail },
         { name: 'Device Coverage', score: 75, weight: COVERAGE_WEIGHT, detail: noDataDetail },
+        ticketComponent,
       ],
     }
   }
@@ -121,12 +138,12 @@ export function calculateHealth(inputs: HealthInputs): HealthResult {
     detail: `${recentCount} of ${devices.length} devices seen in the last ${SEEN_RECENT_DAYS} days`,
   }
 
-  const rawScore = patchMean * PATCH_WEIGHT + coverageMean * COVERAGE_WEIGHT
+  const rawScore = patchMean * PATCH_WEIGHT + coverageMean * COVERAGE_WEIGHT + tScore * TICKET_WEIGHT
   const score = Math.round(rawScore)
 
   return {
     score,
     band: toBand(score),
-    components: [patchComponent, coverageComponent],
+    components: [patchComponent, coverageComponent, ticketComponent],
   }
 }
