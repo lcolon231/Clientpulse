@@ -8,24 +8,32 @@ import type { PrismaConfig } from "prisma";
 // when running `prisma db push`, `prisma migrate`, `prisma studio`, etc.
 loadEnv({ path: ".env.local" });
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL is not set. Check that .env.local exists and contains DATABASE_URL.",
-  );
-}
+// `prisma generate` only reads the schema to emit TS types — no DB connection
+// is made. Skip the URL guard so CI can run generate without DB secrets.
+const isGenerate = process.argv.includes("generate");
 
-if (!process.env.DIRECT_URL) {
-  throw new Error(
-    "DIRECT_URL is not set. Check that .env.local exists and contains DIRECT_URL.",
-  );
+if (!isGenerate) {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is not set. Check that .env.local exists and contains DATABASE_URL.",
+    );
+  }
+
+  if (!process.env.DIRECT_URL) {
+    throw new Error(
+      "DIRECT_URL is not set. Check that .env.local exists and contains DIRECT_URL.",
+    );
+  }
 }
 
 export default {
   schema: path.join("prisma", "schema.prisma"),
-  datasource: {
-    // DIRECT_URL — non-pooled connection (port 5432).
-    // Required for db push / migrate: DDL statements and advisory locks
-    // don't survive pgBouncer transaction mode (port 6543).
-    url: process.env.DIRECT_URL,
-  },
+  ...(process.env.DIRECT_URL && {
+    datasource: {
+      // DIRECT_URL — non-pooled connection (port 5432).
+      // Required for db push / migrate: DDL statements and advisory locks
+      // don't survive pgBouncer transaction mode (port 6543).
+      url: process.env.DIRECT_URL,
+    },
+  }),
 } satisfies PrismaConfig;
