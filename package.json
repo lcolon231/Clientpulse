@@ -29,7 +29,7 @@
     "@prisma/client": "^7.8.0",
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.106.0",
+    "@supabase/supabase-js": "^2.107.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "class-variance-authority": "^0.7.1",
